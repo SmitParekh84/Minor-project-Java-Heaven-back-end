@@ -1,11 +1,13 @@
 import express from "express"
 import mongoose from "mongoose"
 import dotenv from "dotenv"
+import session from "express-session";
 import cors from "cors" // Import the cors package
-import loginRoute from "./route/login.js" // Login route
+// import loginRoute from "./route/login.js" // Login route
 import signupRoute from "./route/signup.js" // Sign-up route
 import itemRoute from "./route/item.js" // Import item route
-
+import orderRoute from "./route/order.js" // Import item route
+import authRoute from "./route/auth.js"; // Import auth route (for login/signup)
 dotenv.config()
 
 const app = express()
@@ -21,6 +23,14 @@ app.use(
 
 // Middleware to parse JSON requests
 app.use(express.json())
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "080402",
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: false }, // Set to true if using HTTPS
+  })
+);
 
 // MongoDB Connection
 mongoose
@@ -29,9 +39,11 @@ mongoose
   .catch((err) => console.error("MongoDB connection error:", err))
 
 // Routes
-app.use("/api", loginRoute) // Login route
+app.use("/api", authRoute)
+// app.use("/api", loginRoute) // Login route
 app.use("/api", signupRoute) // Sign-up route
 app.use("/api/items", itemRoute)
+app.use("/api", orderRoute)
 
 // Handle undefined routes
 app.use((req, res) => {
