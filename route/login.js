@@ -1,42 +1,41 @@
-import express from 'express';
-import mongoose from 'mongoose';
+import express from "express"
+import bcrypt from "bcrypt"
+import User from "../models/User.js" // Assuming User model is defined in this path
 
-const router = express.Router();
+const router = express.Router()
 
-// Define User schema and model
-const userSchema = new mongoose.Schema({
-    username: String,
-    password: String,
-    email: String,
-    mobno: String
-});
+// Login a user
+router.post("/login", async (req, res) => {
+  const { email, password, mobno, username } = req.body
 
-const User = mongoose.model('User', userSchema);
+  // Validate that at least one identifier is provided
+  if (!email && !mobno && !username) {
+    return res
+      .status(400)
+      .json({ msg: "Email, mobile number, or username is required" })
+  }
 
-// Login route
-router.post('/login', async (req, res) => {
-    const { username, password } = req.body;
+  try {
+    // Create a query to find the user by email, mobile number, or username
+    const query = email ? { email } : mobno ? { mobno } : { username } // Ensure at least one is set
 
-    try {
-        // Find user by username (which can be email or mobno)
-        const user = await User.findOne({
-            $or: [{ email: username }, { mobno: username }]
-        });
-
-        if (!user) {
-            return res.status(400).json({ message: 'User not found' });
-        }
-
-        // Check password
-        if (user.password !== password) {
-            return res.status(400).json({ message: 'Invalid password' });
-        }
-
-        // Successful login
-        res.status(200).json({ message: 'Login successful' });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+    // Check if the user exists
+    const user = await User.findOne(query)
+    if (!user) {
+      return res.status(400).json({ msg: "Invalid credentials" })
     }
-});
 
-export default router;
+    // Validate password
+    const isMatch = await bcrypt.compare(password, user.password) // Ensure you're comparing the hashed password
+    if (!isMatch) {
+      return res.status(400).json({ msg: "Invalid credentials" })
+    }
+
+    res.status(200).json({ msg: "Login successful" })
+  } catch (err) {
+    console.error(err.message)
+    res.status(500).send("Server error")
+  }
+})
+
+export default router
