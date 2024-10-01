@@ -1,5 +1,6 @@
 import express from "express"
 import Item from "../models/Item.js"
+import { body, validationResult } from "express-validator" // Import express-validator
 
 const router = express.Router()
 
@@ -8,17 +9,13 @@ router.get("/", async (req, res) => {
   const { category } = req.query // Get the category from query parameters
 
   try {
-    let items
+    const query = category ? { category } : {} // Create a query based on the presence of a category
+    const items = await Item.find(query) // Fetch items based on the query
 
-    // If a category is provided, filter items by category
-    if (category) {
-      items = await Item.find({ category })
-      if (items.length === 0) {
-        return res.status(404).json({ msg: "No items found for this category" })
-      }
-    } else {
-      // If no category is provided, get all items
-      items = await Item.find()
+    if (!items.length) {
+      return res.status(404).json({
+        msg: category ? "No items found for this category" : "No items found",
+      })
     }
 
     res.status(200).json(items)
@@ -32,6 +29,11 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   const { id } = req.params // Extract the ID from the URL parameters
 
+  // Validate ID format
+  if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+    return res.status(400).json({ msg: "Invalid item ID format" })
+  }
+
   try {
     const item = await Item.findById(id) // Find item by ID
     if (!item) {
@@ -44,25 +46,39 @@ router.get("/:id", async (req, res) => {
   }
 })
 
-// Create a new item
-router.post("/", async (req, res) => {
-  const { name, description, price, category, isBestseller } = req.body
+// Create a new item with validation
+router.post(
+  "/",
+  [
+    body("name").notEmpty().withMessage("Name is required"),
+    body("description").notEmpty().withMessage("Description is required"),
+    body("price").isNumeric().withMessage("Price must be a number"),
+    body("category").notEmpty().withMessage("Category is required"),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() }) // Return errors if validation fails
+    }
 
-  try {
-    const newItem = new Item({
-      name,
-      description,
-      price,
-      category,
-      isBestseller,
-    })
+    const { name, description, price, category, isBestseller } = req.body
 
-    await newItem.save()
-    res.status(201).json(newItem)
-  } catch (err) {
-    console.error(err.message)
-    res.status(500).send("Server error")
+    try {
+      const newItem = new Item({
+        name,
+        description,
+        price,
+        category,
+        isBestseller,
+      })
+
+      await newItem.save()
+      res.status(201).json(newItem) // Respond with the created item
+    } catch (err) {
+      console.error(err.message)
+      res.status(500).send("Server error")
+    }
   }
-})
+)
 
 export default router
