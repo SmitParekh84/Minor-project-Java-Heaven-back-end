@@ -14,10 +14,15 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true, // Ensure email is unique
   },
+
   mobno: {
     type: String,
     required: true,
   },
+  resetOTP: {
+    type: String, // OTP for password reset
+  },
+
 })
 
 // Ensure to use the model only if it hasn't been defined yet

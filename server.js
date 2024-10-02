@@ -1,16 +1,18 @@
-import express from "express"
-import mongoose from "mongoose"
-import dotenv from "dotenv"
+// server.js
+import express from "express";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
 import session from "express-session";
-import cors from "cors" // Import the cors package
-// import loginRoute from "./route/login.js" // Login route
-import signupRoute from "./route/signup.js" // Sign-up route
-import itemRoute from "./route/item.js" // Import item route
-import orderRoute from "./route/order.js" // Import item route
+import cors from "cors"; // Import the cors package
+import signupRoute from "./route/signup.js"; // Sign-up route
+import itemRoute from "./route/item.js"; // Import item route
+import orderRoute from "./route/order.js"; // Import order route
 import authRoute from "./route/auth.js"; // Import auth route (for login/signup)
-dotenv.config()
+import forgotPasswordRoute from "./route/forgotPassword.js"; // Import forgot password route
 
-const app = express()
+dotenv.config();
+
+const app = express();
 
 // Middleware to enable CORS
 app.use(
@@ -19,10 +21,10 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE"], // Allowed methods
     credentials: true, // Enable credentials if needed (cookies, authorization headers)
   })
-)
+);
 
 // Middleware to parse JSON requests
-app.use(express.json())
+app.use(express.json());
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "080402",
@@ -36,21 +38,22 @@ app.use(
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected"))
-  .catch((err) => console.error("MongoDB connection error:", err))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
 // Routes
-app.use("/api", authRoute)
-// app.use("/api", loginRoute) // Login route
-app.use("/api", signupRoute) // Sign-up route
-app.use("/api/items", itemRoute)
-app.use("/api", orderRoute)
+app.use("/api", authRoute);
+app.use("/api", signupRoute); // Sign-up route
+app.use("/api/items", itemRoute); // Item route
+app.use("/api/", orderRoute); // Order route
+app.use("/api", forgotPasswordRoute); // Use forgot password route
 
 // Handle undefined routes
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" })
-})
+  res.status(404).json({ message: "Route not found" });
+});
 
-const PORT = process.env.PORT || 5000
+// Start the server
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port http://localhost:${PORT}`)
-})
+  console.log(`Server running on http://localhost:${PORT}`);
+});
