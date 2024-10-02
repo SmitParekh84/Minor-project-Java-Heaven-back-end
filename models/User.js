@@ -14,7 +14,10 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true, // Ensure email is unique
   },
-
+  role: {
+    type: String,
+    default: 'user', // or 'admin'
+  },
   mobno: {
     type: String,
     required: true,

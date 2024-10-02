@@ -9,6 +9,8 @@ import itemRoute from "./route/item.js"; // Import item route
 import orderRoute from "./route/order.js"; // Import order route
 import authRoute from "./route/auth.js"; // Import auth route (for login/signup)
 import forgotPasswordRoute from "./route/forgotPassword.js"; // Import forgot password route
+import dashboardRoute from "./route/dashboard.js"; // Import dashboard route
+import userRoute from "./route/user.js"; // Import the new user route
 
 dotenv.config();
 
@@ -46,6 +48,9 @@ app.use("/api", signupRoute); // Sign-up route
 app.use("/api/items", itemRoute); // Item route
 app.use("/api/", orderRoute); // Order route
 app.use("/api", forgotPasswordRoute); // Use forgot password route
+app.use("/api", dashboardRoute); // Dashboard statistics route
+app.use("/api", userRoute); // Use the user route
+
 
 // Handle undefined routes
 app.use((req, res) => {

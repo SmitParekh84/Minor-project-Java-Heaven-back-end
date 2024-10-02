@@ -59,4 +59,125 @@ router.post("/logout", (req, res) => {
     });
 });
 
+
+// Admin registration endpoint
+router.post("/admin/add", async (req, res) => {
+    const { username, password, mobno, email } = req.body;
+
+    // Validate required fields
+    if (!username || !password || !mobno || !email) {
+        return res.status(400).json({ msg: "Username, password, mobile number, and email are required." });
+    }
+
+    try {
+        // Check if admin already exists
+        const existingAdmin = await User.findOne({ username });
+        if (existingAdmin) {
+            return res.status(400).json({ msg: "Admin already exists." });
+        }
+
+        // Hash the password before saving
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create a new admin user
+        const newAdmin = new User({
+            username,
+            password: hashedPassword,
+            mobno,  // Include mobile number
+            email,  // Include email
+            role: 'admin', // Ensure you have a role field in your user schema
+        });
+
+        await newAdmin.save();
+
+        res.status(201).json({ msg: "Admin added successfully." });
+    } catch (error) {
+        console.error("Error adding admin:", error);
+        res.status(500).json({ msg: "Server error", error: error.message });
+    }
+});
+
+
+// Admin login
+// Admin login
+router.post("/admin/login", async (req, res) => {
+    const { username, password } = req.body;
+
+    // Validate required fields
+    if (!username || !password) {
+        return res.status(400).json({ msg: "Username and password are required." });
+    }
+
+    try {
+        // Find the admin by username
+        const admin = await User.findOne({ username, role: 'admin' }); // Ensure you only check admins
+        if (!admin) {
+            return res.status(400).json({ msg: "Invalid credentials." });
+        }
+
+        // Validate password
+        const isMatch = await bcrypt.compare(password, admin.password);
+        if (!isMatch) {
+            return res.status(400).json({ msg: "Invalid credentials." });
+        }
+
+        // Generate a session ID
+        const sessionId = uuidv4(); // Create a new session ID
+
+        // Successful login
+        res.status(200).json({
+            msg: "Login successful.",
+            sessionId, // Include the generated sessionId in the response
+            admin: {
+                username: admin.username,
+                email: admin.email,
+                role: admin.role,
+            },
+        });
+    } catch (error) {
+        console.error("Error logging in admin:", error);
+        res.status(500).json({ msg: "Server error", error: error.message });
+    }
+});
+// Fetch all admins
+router.get("/admin/list", async (req, res) => {
+    try {
+        const admins = await User.find({ role: 'admin' }, 'username email mobno'); // Only fetch required fields
+        res.status(200).json({ admins });
+    } catch (error) {
+        console.error("Error fetching admin list:", error);
+        res.status(500).json({ msg: "Server error", error: error.message });
+    }
+});
+// Edit admin details
+router.put("/admin/edit/:id", async (req, res) => {
+    const { username, email, mobno, password } = req.body;
+    const adminId = req.params.id;
+
+    // Validate required fields
+    if (!username || !email || !mobno) {
+        return res.status(400).json({ msg: "Username, email, and mobile number are required." });
+    }
+
+    try {
+        const updateData = { username, email, mobno };
+
+        // If password is provided, hash it
+        if (password) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            updateData.password = hashedPassword;
+        }
+
+        const updatedAdmin = await User.findByIdAndUpdate(adminId, updateData, { new: true });
+        if (!updatedAdmin) {
+            return res.status(404).json({ msg: "Admin not found." });
+        }
+
+        res.status(200).json({ msg: "Admin updated successfully." });
+    } catch (error) {
+        console.error("Error updating admin:", error);
+        res.status(500).json({ msg: "Server error", error: error.message });
+    }
+});
+
 export default router;

@@ -45,7 +45,47 @@ router.get("/:id", async (req, res) => {
     res.status(500).send("Server error")
   }
 })
+router.put(
+  "/:id",
+  [
+    body("name").notEmpty().withMessage("Name is required"),
+    body("description").notEmpty().withMessage("Description is required"),
+    body("price").isNumeric().withMessage("Price must be a number"),
+    body("category").notEmpty().withMessage("Category is required"),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() }); // Return errors if validation fails
+    }
 
+    const { id } = req.params; // Extract the ID from the URL parameters
+    const { name, description, price, category, isBestseller, imageUrl } = req.body;
+
+    try {
+      const updatedItem = await Item.findByIdAndUpdate(
+        id,
+        {
+          name,
+          description,
+          price,
+          category,
+          isBestseller,
+          imageUrl, // Include imageUrl in the update
+        },
+        { new: true } // Return the updated item
+      );
+
+      if (!updatedItem) {
+        return res.status(404).json({ msg: "Item not found" });
+      }
+      res.status(200).json(updatedItem); // Respond with the updated item
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send("Server error");
+    }
+  }
+);
 // Create a new item with validation
 router.post(
   "/",

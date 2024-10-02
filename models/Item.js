@@ -18,6 +18,10 @@ const ItemSchema = new mongoose.Schema({
     enum: ["Drinks", "Food", "Coffee At Home"], // Define the allowed categories
     required: true,
   },
+  imageUrl: { // Add the imageUrl field
+    type: String,
+    required: false, // Make it optional; change to true if it should be required
+  },
   isBestseller: {
     type: Boolean,
     default: false, // Default to false
