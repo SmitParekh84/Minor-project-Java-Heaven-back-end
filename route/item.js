@@ -94,6 +94,7 @@ router.post(
     body("description").notEmpty().withMessage("Description is required"),
     body("price").isNumeric().withMessage("Price must be a number"),
     body("category").notEmpty().withMessage("Category is required"),
+    body("imageUrl").notEmpty().withMessage("Category is required"),
   ],
   async (req, res) => {
     const errors = validationResult(req)
@@ -101,7 +102,7 @@ router.post(
       return res.status(400).json({ errors: errors.array() }) // Return errors if validation fails
     }
 
-    const { name, description, price, category, isBestseller } = req.body
+    const { name, description, price, category, isBestseller, imageUrl } = req.body
 
     try {
       const newItem = new Item({
@@ -110,6 +111,7 @@ router.post(
         price,
         category,
         isBestseller,
+        imageUrl,
       })
 
       await newItem.save()
@@ -120,5 +122,26 @@ router.post(
     }
   }
 )
+// Delete an item by ID
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params; // Extract the ID from the URL parameters
 
+  // Validate ID format
+  if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+    return res.status(400).json({ msg: "Invalid item ID format" });
+  }
+
+  try {
+    const deletedItem = await Item.findByIdAndDelete(id); // Find and delete the item by ID
+
+    if (!deletedItem) {
+      return res.status(404).json({ msg: "Item not found" });
+    }
+
+    res.status(200).json({ msg: "Item deleted successfully" }); // Respond with success message
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server error");
+  }
+});
 export default router

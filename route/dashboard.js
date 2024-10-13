@@ -39,15 +39,32 @@ router.get('/dashboard', async (req, res) => {
             { $limit: 5 } // Limit to top 5 best-selling items
         ]);
 
-        // Log the result to debug
-        console.log(bestSellingItems); // Debugging line
+        // Fetch monthly order data based on the createdAt field
+        const ordersPerMonth = await Order.aggregate([
+            {
+                $group: {
+                    _id: { $month: '$createdAt' }, // Group by month
+                    totalOrders: { $sum: 1 }, // Count orders in each month
+                    totalSales: { $sum: '$totalAmount' } // Sum total sales in each month
+                }
+            },
+            { $sort: { '_id': 1 } } // Sort by month (1 to 12)
+        ]);
 
+        // Format the data for the frontend
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthlyData = ordersPerMonth.map(monthData => ({
+            month: months[monthData._id - 1], // Convert month number to name
+            totalOrders: monthData.totalOrders,
+            totalSales: monthData.totalSales
+        }));
 
         res.json({
             totalOrders,
             totalUsers,
-            totalSales: totalSales[0]?.total || 0, // Get the total sales value
-            bestSellingItems
+            totalSales: totalSales[0]?.total || 0,
+            bestSellingItems,
+            monthlyData // Send the monthly data to the frontend
         });
     } catch (err) {
         console.error(err);

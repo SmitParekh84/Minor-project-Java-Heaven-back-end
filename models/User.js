@@ -25,6 +25,10 @@ const userSchema = new mongoose.Schema({
   resetOTP: {
     type: String, // OTP for password reset
   },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 
 })
 
