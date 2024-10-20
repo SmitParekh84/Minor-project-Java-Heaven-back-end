@@ -70,22 +70,35 @@ router.post("/admin/add", async (req, res) => {
     }
 
     try {
-        // Check if admin already exists
-        const existingAdmin = await User.findOne({ username });
-        if (existingAdmin) {
-            return res.status(400).json({ msg: "Admin already exists." });
+        // Check if a user with the same username already exists
+        const existingUser = await User.findOne({ username });
+
+        if (existingUser) {
+            // If the existing user is already an admin, return an error
+            if (existingUser.role === 'admin') {
+                return res.status(400).json({ msg: "Admin already exists." });
+            }
+
+            // If the existing user is not an admin, update their role to 'admin'
+            existingUser.role = 'admin';
+            existingUser.password = await bcrypt.hash(password, 10); // Update password if needed
+            existingUser.mobno = mobno; // Update mobile number if needed
+            existingUser.email = email; // Update email if needed
+
+            await existingUser.save();
+
+            return res.status(200).json({ msg: "User has been updated to admin." });
         }
 
-        // Hash the password before saving
+        // If no user exists with the given username, create a new admin user
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create a new admin user
         const newAdmin = new User({
             username,
             password: hashedPassword,
-            mobno,  // Include mobile number
-            email,  // Include email
-            role: 'admin', // Ensure you have a role field in your user schema
+            mobno,
+            email,
+            role: 'admin',
         });
 
         await newAdmin.save();
@@ -96,6 +109,7 @@ router.post("/admin/add", async (req, res) => {
         res.status(500).json({ msg: "Server error", error: error.message });
     }
 });
+
 
 
 // Admin login
@@ -176,6 +190,24 @@ router.put("/admin/edit/:id", async (req, res) => {
         res.status(200).json({ msg: "Admin updated successfully." });
     } catch (error) {
         console.error("Error updating admin:", error);
+        res.status(500).json({ msg: "Server error", error: error.message });
+    }
+});
+// Delete an admin
+router.delete("/admin/delete/:id", async (req, res) => {
+    const adminId = req.params.id;
+
+    try {
+        // Find the admin by ID and remove it
+        const deletedAdmin = await User.findByIdAndDelete(adminId);
+
+        if (!deletedAdmin) {
+            return res.status(404).json({ msg: "Admin not found." });
+        }
+
+        res.status(200).json({ msg: "Admin deleted successfully." });
+    } catch (error) {
+        console.error("Error deleting admin:", error);
         res.status(500).json({ msg: "Server error", error: error.message });
     }
 });
