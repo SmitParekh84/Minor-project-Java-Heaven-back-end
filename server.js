@@ -19,7 +19,7 @@ const app = express();
 // Middleware to enable CORS
 app.use(
   cors({
-    origin: "http://localhost:5173", // Allow requests from your frontend
+    origin: process.env.FRONTEND_URL || "http://localhost:5173", // Allow requests from your frontend
     methods: ["GET", "POST", "PUT", "DELETE"], // Allowed methods
     credentials: true, // Enable credentials if needed (cookies, authorization headers)
   })
@@ -56,7 +56,10 @@ app.use("/api", userRoute); // Use the user route
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
-
+// Define a simple GET route for a welcome message
+app.get("/", (req, res) => {
+  res.send("Welcome to the Coffee Shop Management System API");
+});
 // Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
