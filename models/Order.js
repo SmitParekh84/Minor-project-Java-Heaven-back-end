@@ -45,6 +45,7 @@ const OrderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+
   },
   { timestamps: true }
 ) // Automatically add createdAt and updatedAt fields

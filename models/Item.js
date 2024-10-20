@@ -15,8 +15,8 @@ const ItemSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ["Drinks", "Food", "Coffee At Home"], // Define the allowed categories
     required: true,
+    unique: true,
   },
   imageUrl: { // Add the imageUrl field
     type: String,
