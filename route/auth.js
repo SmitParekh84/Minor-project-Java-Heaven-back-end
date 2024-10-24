@@ -126,7 +126,7 @@ router.post("/admin/add", [
 
 // Admin login
 router.post("/admin/login", [
-    body('username').notEmpty().withMessage("Username is required."),
+    body('username').notEmpty().withMessage("Username is Required."),
     body('password').notEmpty().withMessage("Password is required."),
 ], async (req, res) => {
     const { username, password } = req.body;
