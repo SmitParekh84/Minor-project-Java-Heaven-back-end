@@ -181,7 +181,7 @@ router.get('/best-selling', async (req, res) => {
     ]);
 
     if (bestSellingItems.length === 0) {
-      return res.status(404).json({ message: 'No best-selling item found' });
+      return res.status(404).json({ message: 'No best selling item found' });
     }
 
     res.status(200).json({ bestSellingItem: bestSellingItems[0] });
