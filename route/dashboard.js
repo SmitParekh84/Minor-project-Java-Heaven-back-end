@@ -5,6 +5,12 @@ import Item from '../models/Item.js'; // Adjust the import based on your actual 
 
 const router = express.Router();
 
+// Constants for better readability and maintainability
+const MONTHS = [
+    'January', 'February', 'March', 'April', 'May', 'June', 
+    'July', 'August', 'September', 'October', 'November', 'December'
+];
+
 // Endpoint to get dashboard statistics
 router.get('/dashboard', async (req, res) => {
     try {
@@ -15,7 +21,7 @@ router.get('/dashboard', async (req, res) => {
         const totalUsers = await User.countDocuments();
 
         // Fetch total sales
-        const totalSales = await Order.aggregate([
+        const totalSalesResult = await Order.aggregate([
             {
                 $group: {
                     _id: null,
@@ -24,7 +30,8 @@ router.get('/dashboard', async (req, res) => {
             }
         ]);
 
-        // Fetch best-selling items
+        const totalSales = totalSalesResult[0]?.total || 0; // Safely access total
+
         // Fetch best-selling items
         const bestSellingItems = await Order.aggregate([
             { $unwind: '$items' }, // Flatten the items array
@@ -52,23 +59,25 @@ router.get('/dashboard', async (req, res) => {
         ]);
 
         // Format the data for the frontend
-        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
         const monthlyData = ordersPerMonth.map(monthData => ({
-            month: months[monthData._id - 1], // Convert month number to name
+            month: MONTHS[monthData._id - 1], // Convert month number to name
             totalOrders: monthData.totalOrders,
             totalSales: monthData.totalSales
         }));
 
-        res.json({
-            totalOrders,
-            totalUsers,
-            totalSales: totalSales[0]?.total || 0,
-            bestSellingItems,
-            monthlyData // Send the monthly data to the frontend
+        res.status(200).json({
+            status: 'success',
+            data: {
+                totalOrders,
+                totalUsers,
+                totalSales,
+                bestSellingItems,
+                monthlyData // Send the monthly data to the frontend
+            }
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server error' });
+        console.error("Error fetching dashboard data:", err.message);
+        res.status(500).json({ status: 'error', message: 'Server error' });
     }
 });
 
