@@ -13,8 +13,11 @@ const MONTHS = [
 // Endpoint to get revenue data
 router.get('/', async (req, res) => {
     try {
-        // Fetch monthly sales data
+        // Fetch monthly sales data for delivered orders only
         const monthlySalesData = await Order.aggregate([
+            {
+                $match: { isDelivered: true } // Only consider delivered orders
+            },
             {
                 $group: {
                     _id: { $month: '$createdAt' }, // Group by month
@@ -46,6 +49,5 @@ router.get('/', async (req, res) => {
         res.status(500).json({ status: 'error', message: 'Server error' });
     }
 });
-
 
 export default router;

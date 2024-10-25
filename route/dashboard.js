@@ -12,16 +12,20 @@ const MONTHS = [
 ];
 
 // Endpoint to get dashboard statistics
+// Endpoint to get dashboard statistics
 router.get('/dashboard', async (req, res) => {
     try {
-        // Fetch total number of orders
-        const totalOrders = await Order.countDocuments();
+        // Fetch total number of delivered orders
+        const totalOrders = await Order.countDocuments({ status: 'Delivered' });
 
         // Fetch total number of users
         const totalUsers = await User.countDocuments();
 
-        // Fetch total sales
+        // Fetch total sales for delivered orders only
         const totalSalesResult = await Order.aggregate([
+            {
+                $match: { status: 'Delivered' } // Only consider delivered orders
+            },
             {
                 $group: {
                     _id: null,
@@ -32,8 +36,9 @@ router.get('/dashboard', async (req, res) => {
 
         const totalSales = totalSalesResult[0]?.total || 0; // Safely access total
 
-        // Fetch best-selling items
+        // Fetch best-selling items from delivered orders only
         const bestSellingItems = await Order.aggregate([
+            { $match: { status: 'Delivered' } }, // Only consider delivered orders
             { $unwind: '$items' }, // Flatten the items array
             {
                 $group: {
@@ -46,8 +51,9 @@ router.get('/dashboard', async (req, res) => {
             { $limit: 5 } // Limit to top 5 best-selling items
         ]);
 
-        // Fetch monthly order data based on the createdAt field
+        // Fetch monthly order data based on the createdAt field for delivered orders
         const ordersPerMonth = await Order.aggregate([
+            { $match: { status: 'Delivered' } }, // Only consider delivered orders
             {
                 $group: {
                     _id: { $month: '$createdAt' }, // Group by month
@@ -80,5 +86,6 @@ router.get('/dashboard', async (req, res) => {
         res.status(500).json({ status: 'error', message: 'Server error' });
     }
 });
+
 
 export default router;
