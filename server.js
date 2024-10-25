@@ -28,7 +28,7 @@ app.use(morgan("combined"));
 // Middleware to enable CORS
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL, // Allow requests from your frontend
+    origin: process.env.FRONTEND_URL || 'https://staging-java-heaven.netlify.app', // Allow requests from your frontend
     methods: ["GET", "POST", "PUT", "DELETE"], // Allowed methods
     credentials: true, // Enable credentials if needed (cookies, authorization headers)
   })
