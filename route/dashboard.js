@@ -11,7 +11,46 @@ const MONTHS = [
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-// Endpoint to get dashboard statistics
+// Add this function in your dashboard route to fetch daily and yearly data
+const getAggregatedData = async () => {
+    const dailyData = await Order.aggregate([
+        { $match: { status: 'Delivered' } },
+        {
+            $group: {
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                totalOrders: { $sum: 1 },
+                totalSales: { $sum: '$totalAmount' }
+            }
+        },
+        { $sort: { '_id': 1 } } // Sort by date
+    ]);
+
+    const yearlyData = await Order.aggregate([
+        { $match: { status: 'Delivered' } },
+        {
+            $group: {
+                _id: { $year: "$createdAt" },
+                totalOrders: { $sum: 1 },
+                totalSales: { $sum: '$totalAmount' }
+            }
+        },
+        { $sort: { '_id': 1 } } // Sort by year
+    ]);
+
+    // New aggregation for total users per month
+    const usersPerMonth = await User.aggregate([
+        {
+            $group: {
+                _id: { $month: '$createdAt' }, // Group by month
+                totalUsers: { $sum: 1 } // Count users in each month
+            }
+        },
+        { $sort: { '_id': 1 } } // Sort by month (1 to 12)
+    ]);
+
+    return { dailyData, yearlyData, usersPerMonth };
+};
+
 // Endpoint to get dashboard statistics
 router.get('/dashboard', async (req, res) => {
     try {
@@ -58,6 +97,7 @@ router.get('/dashboard', async (req, res) => {
                 $group: {
                     _id: { $month: '$createdAt' }, // Group by month
                     totalOrders: { $sum: 1 }, // Count orders in each month
+                    totalUsers: { $sum: 1 }, // Count users in each month
                     totalSales: { $sum: '$totalAmount' } // Sum total sales in each month
                 }
             },
@@ -68,8 +108,28 @@ router.get('/dashboard', async (req, res) => {
         const monthlyData = ordersPerMonth.map(monthData => ({
             month: MONTHS[monthData._id - 1], // Convert month number to name
             totalOrders: monthData.totalOrders,
+            totalUsers:monthData.totalUsers,
             totalSales: monthData.totalSales
         }));
+
+        // Fetch monthly user data based on the createdAt field
+        const usersPerMonth = await User.aggregate([
+            {
+                $group: {
+                    _id: { $month: '$createdAt' }, // Group by month
+                    totalUsers: { $sum: 1 }, // Count users registered in each month
+                }
+            },
+            { $sort: { '_id': 1 } } // Sort by month (1 to 12)
+        ]);
+
+        // Format the monthly user data
+        const monthlyUsers = usersPerMonth.map(userData => ({
+            month: MONTHS[userData._id - 1], // Convert month number to name
+            totalUsers: userData.totalUsers
+        }));
+
+        const { dailyData, yearlyData } = await getAggregatedData();
 
         res.status(200).json({
             status: 'success',
@@ -78,7 +138,11 @@ router.get('/dashboard', async (req, res) => {
                 totalUsers,
                 totalSales,
                 bestSellingItems,
-                monthlyData // Send the monthly data to the frontend
+                monthlyData, // Send the monthly order data to the frontend
+                monthlyUsers, // Send the monthly user data to the frontend
+                dailyData, // New daily data
+                yearlyData, // New yearly data
+                usersPerMonth,
             }
         });
     } catch (err) {
@@ -86,6 +150,5 @@ router.get('/dashboard', async (req, res) => {
         res.status(500).json({ status: 'error', message: 'Server error' });
     }
 });
-
 
 export default router;
