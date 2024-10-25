@@ -7,7 +7,7 @@ const router = express.Router();
 
 // Constants for better readability and maintainability
 const MONTHS = [
-    'January', 'February', 'March', 'April', 'May', 'June', 
+    'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
@@ -19,6 +19,7 @@ const getAggregatedData = async () => {
             $group: {
                 _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
                 totalOrders: { $sum: 1 },
+                // totalUsers: { $sum: 1 },
                 totalSales: { $sum: '$totalAmount' }
             }
         },
@@ -108,7 +109,7 @@ router.get('/dashboard', async (req, res) => {
         const monthlyData = ordersPerMonth.map(monthData => ({
             month: MONTHS[monthData._id - 1], // Convert month number to name
             totalOrders: monthData.totalOrders,
-            totalUsers:monthData.totalUsers,
+            totalUsers: monthData.totalUsers,
             totalSales: monthData.totalSales
         }));
 
