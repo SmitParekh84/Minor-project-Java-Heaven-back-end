@@ -24,6 +24,11 @@ app.use(helmet());
 
 // Middleware for logging
 app.use(morgan("combined"));
+
+
+app.use(cors()); // Allow all origins temporarily (for debugging)
+
+// Middleware to enable CORS
 // app.use(
 //   cors({
 //     origin: process.env.FRONTEND_URL, // Allow requests from your frontend
@@ -31,9 +36,6 @@ app.use(morgan("combined"));
 //     credentials: true, // Enable credentials if needed
 //   })
 // );
-// Middleware to enable CORS
-app.use(cors()); // Allow all origins temporarily (for debugging)
-
 
 app.use((req, res, next) => {
   console.log('Request Origin:', req.headers.origin);
