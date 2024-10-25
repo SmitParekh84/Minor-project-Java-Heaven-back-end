@@ -19,7 +19,7 @@ const getAggregatedData = async () => {
             $group: {
                 _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
                 totalOrders: { $sum: 1 },
-                totalUsers: { $sum: 1 },
+                // totalUsers: { $sum: 1 },
                 totalSales: { $sum: '$totalAmount' }
             }
         },
