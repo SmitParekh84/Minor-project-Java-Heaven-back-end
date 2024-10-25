@@ -67,7 +67,7 @@ app.use("/api", orderRoute); // Order route
 app.use("/api", forgotPasswordRoute); // Use forgot password route
 app.use("/api", dashboardRoute); // Dashboard statistics route
 app.use("/api", userRoute); // Use the user route
-app.use('/api/revenue', revenueRoute);  
+app.use('/api/revenue', revenueRoute);
 
 // Handle undefined routes
 app.use((req, res) => {
