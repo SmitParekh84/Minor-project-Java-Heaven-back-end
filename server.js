@@ -26,15 +26,15 @@ app.use(helmet());
 app.use(morgan("combined"));
 
 
-app.use(cors()); // Allow all origins temporarily (for debugging)
+// app.use(cors()); // Allow all origins temporarily (for debugging)
 // Middleware to enable CORS
-// app.use(
-//   cors({
-//     origin: process.env.FRONTEND_URL, // Allow requests from your frontend
-//     methods: ["GET", "POST", "PUT", "DELETE"], // Allowed methods
-//     credentials: true, // Enable credentials if needed
-//   })
-// );
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL, // Allow requests from your frontend
+    methods: ["GET", "POST", "PUT", "DELETE"], // Allowed methods
+    credentials: true, // Enable credentials if needed
+  })
+);
 
 app.use((req, res, next) => {
   console.log('Request Origin:', req.headers.origin);
