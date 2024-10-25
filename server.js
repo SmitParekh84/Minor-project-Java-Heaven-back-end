@@ -27,7 +27,6 @@ app.use(morgan("combined"));
 
 
 app.use(cors()); // Allow all origins temporarily (for debugging)
-
 // Middleware to enable CORS
 // app.use(
 //   cors({
