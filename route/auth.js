@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import User from "../models/User.js"; // Assuming User model is defined in this path
 import { v4 as uuidv4 } from "uuid"; // Import UUID for generating session IDs
+import { body, validationResult } from "express-validator"; // For input validation
 
 const router = express.Router();
 
@@ -10,9 +11,15 @@ const router = express.Router();
 router.post("/login", async (req, res) => {
     const { identifier, password } = req.body;
 
+
     // Validate that identifier and password are provided
     if (!identifier || !password) {
         return res.status(400).json({ msg: "Identifier and password are required" });
+    }
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
     }
 
     try {
@@ -49,14 +56,14 @@ router.post("/login", async (req, res) => {
             },
         });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Server error");
+        console.error("Error logging in user:", err.message);
+        res.status(500).json({ msg: "Server error" });
     }
 });
 
-
 // Logout user and destroy the session
 router.post("/logout", (req, res) => {
+    // Implement session destruction logic if using sessions
     req.session.destroy((err) => {
         if (err) {
             return res.status(500).json({ msg: "Logout failed" });
@@ -65,14 +72,18 @@ router.post("/logout", (req, res) => {
     });
 });
 
-
 // Admin registration endpoint
-router.post("/admin/add", async (req, res) => {
+router.post("/admin/add", [
+    body('username').notEmpty().withMessage("Username is required."),
+    body('password').notEmpty().withMessage("Password is required."),
+    body('mobno').notEmpty().isNumeric().withMessage("Mobile number is required."),
+    body('email').notEmpty().isEmail().withMessage("Valid email is required."),
+], async (req, res) => {
     const { username, password, mobno, email } = req.body;
 
-    // Validate required fields
-    if (!username || !password || !mobno || !email) {
-        return res.status(400).json({ msg: "Username, password, mobile number, and email are required." });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
     }
 
     try {
@@ -116,21 +127,21 @@ router.post("/admin/add", async (req, res) => {
     }
 });
 
-
-
 // Admin login
-// Admin login
-router.post("/admin/login", async (req, res) => {
+router.post("/admin/login", [
+    body('username').notEmpty().withMessage("Username is Required."),
+    body('password').notEmpty().withMessage("Password is required."),
+], async (req, res) => {
     const { username, password } = req.body;
 
-    // Validate required fields
-    if (!username || !password) {
-        return res.status(400).json({ msg: "Username and password are required." });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
     }
 
     try {
         // Find the admin by username
-        const admin = await User.findOne({ username, role: 'admin' }); // Ensure you only check admins
+        const admin = await User.findOne({ username, role: 'admin' });
         if (!admin) {
             return res.status(400).json({ msg: "Invalid credentials." });
         }
@@ -147,7 +158,7 @@ router.post("/admin/login", async (req, res) => {
         // Successful login
         res.status(200).json({
             msg: "Login successful.",
-            sessionId, // Include the generated sessionId in the response
+            sessionId,
             admin: {
                 username: admin.username,
                 email: admin.email,
@@ -159,6 +170,7 @@ router.post("/admin/login", async (req, res) => {
         res.status(500).json({ msg: "Server error", error: error.message });
     }
 });
+
 // Fetch all admins
 router.get("/admin/list", async (req, res) => {
     try {
@@ -169,6 +181,7 @@ router.get("/admin/list", async (req, res) => {
         res.status(500).json({ msg: "Server error", error: error.message });
     }
 });
+
 // Edit admin details
 router.put("/admin/edit/:id", async (req, res) => {
     const { username, email, mobno, password } = req.body;
@@ -199,6 +212,7 @@ router.put("/admin/edit/:id", async (req, res) => {
         res.status(500).json({ msg: "Server error", error: error.message });
     }
 });
+
 // Delete an admin
 router.delete("/admin/delete/:id", async (req, res) => {
     const adminId = req.params.id;

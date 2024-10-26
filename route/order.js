@@ -1,18 +1,27 @@
-// routes/order.js
 import express from "express";
 import Order from "../models/Order.js";
 
 const router = express.Router();
 
-// Order route
-// Create a new order
-router.post("/orders", async (req, res) => {
+// Input validation middleware for creating an order
+const validateOrder = (req, res, next) => {
   const { userId, cartItems } = req.body;
-
-  // Validate request data
   if (!userId || !cartItems || !Array.isArray(cartItems)) {
     return res.status(400).json({ error: "Invalid request data" });
   }
+  
+  for (const item of cartItems) {
+    if (!item.id || !item.name || !item.price || !item.quantity) {
+      return res.status(400).json({ error: "Each cart item must have id, name, price, and quantity" });
+    }
+  }
+
+  next();
+};
+
+// Create a new order
+router.post("/orders", validateOrder, async (req, res) => {
+  const { userId, cartItems } = req.body;
 
   try {
     // Calculate total amount
@@ -68,8 +77,7 @@ router.get("/orders/:userId", async (req, res) => {
   }
 });
 
-// New route to get all orders for admin
-// New route to get all orders for admin
+// Get all orders for admin
 router.get("/admin/orders", async (req, res) => {
   try {
     const orders = await Order.find().populate('userId', 'email mobile'); // Populate email and mobile
@@ -115,7 +123,6 @@ router.put("/orders/:id/status", async (req, res) => {
   }
 });
 
-
 // Calculate total revenue and best-selling item
 router.get("/admin/revenue", async (req, res) => {
   try {
@@ -157,7 +164,6 @@ router.get("/admin/revenue", async (req, res) => {
 });
 
 // Get the best-selling item
-// Assuming you want to fetch the best-selling item separately
 router.get('/best-selling', async (req, res) => {
   try {
     const bestSellingItems = await Order.aggregate([
@@ -175,15 +181,14 @@ router.get('/best-selling', async (req, res) => {
     ]);
 
     if (bestSellingItems.length === 0) {
-      return res.status(404).json({ message: 'No best-selling item found' });
+      return res.status(404).json({ message: 'No best selling item found' });
     }
 
-    res.json({ bestSellingItem: bestSellingItems[0] });
+    res.status(200).json({ bestSellingItem: bestSellingItems[0] });
   } catch (err) {
     console.error("Error fetching best-selling item:", err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error', details: err.message });
   }
 });
-
 
 export default router; // Use ES6 export for consistency
