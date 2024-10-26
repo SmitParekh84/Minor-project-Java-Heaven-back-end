@@ -53,6 +53,7 @@ const getAggregatedData = async () => {
 };
 
 // Endpoint to get dashboard statistics
+// Endpoint to get dashboard statistics with differentiation for delivery options
 router.get('/dashboard', async (req, res) => {
     try {
         // Fetch total number of delivered orders
@@ -132,6 +133,25 @@ router.get('/dashboard', async (req, res) => {
 
         const { dailyData, yearlyData } = await getAggregatedData();
 
+        // Add aggregation based on delivery options
+        const deliveryOptionData = await Order.aggregate([
+            { $match: { status: 'Delivered' } }, // Only consider delivered orders
+            {
+                $group: {
+                    _id: '$deliveryOption', // Group by deliveryOption field
+                    totalOrders: { $sum: 1 }, // Count orders for each delivery option
+                    totalSales: { $sum: '$totalAmount' } // Sum up sales for each delivery option
+                }
+            }
+        ]);
+
+        // Format the delivery option data
+        const formattedDeliveryOptionData = deliveryOptionData.map(option => ({
+            deliveryOption: option._id,
+            totalOrders: option.totalOrders,
+            totalSales: option.totalSales
+        }));
+
         res.status(200).json({
             status: 'success',
             data: {
@@ -144,6 +164,7 @@ router.get('/dashboard', async (req, res) => {
                 dailyData, // New daily data
                 yearlyData, // New yearly data
                 usersPerMonth,
+                deliveryOptionData: formattedDeliveryOptionData // Add delivery option data
             }
         });
     } catch (err) {
@@ -151,5 +172,6 @@ router.get('/dashboard', async (req, res) => {
         res.status(500).json({ status: 'error', message: 'Server error' });
     }
 });
+
 
 export default router;
