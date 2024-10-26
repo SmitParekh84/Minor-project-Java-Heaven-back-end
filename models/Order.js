@@ -34,6 +34,7 @@ const OrderSchema = new mongoose.Schema(
           type: Number,
           required: true,
         },
+
       },
     ],
     status: {
@@ -45,7 +46,17 @@ const OrderSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-
+    deliveryOption: { // New field for delivery option
+      type: String,
+      enum: ["hand", "home"], // Define possible delivery options
+      required: true,
+    },
+    address: { // New field for delivery address
+      type: String,
+      required: function () {
+        return this.deliveryOption === 'home'; // Address is required only for home delivery
+      },
+    },
   },
   { timestamps: true }
 ) // Automatically add createdAt and updatedAt fields

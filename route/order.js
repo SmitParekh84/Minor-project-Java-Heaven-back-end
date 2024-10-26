@@ -9,7 +9,7 @@ const validateOrder = (req, res, next) => {
   if (!userId || !cartItems || !Array.isArray(cartItems)) {
     return res.status(400).json({ error: "Invalid request data" });
   }
-  
+
   for (const item of cartItems) {
     if (!item.id || !item.name || !item.price || !item.quantity) {
       return res.status(400).json({ error: "Each cart item must have id, name, price, and quantity" });
@@ -19,9 +19,8 @@ const validateOrder = (req, res, next) => {
   next();
 };
 
-// Create a new order
 router.post("/orders", validateOrder, async (req, res) => {
-  const { userId, cartItems } = req.body;
+  const { userId, cartItems, deliveryOption, address } = req.body; // Destructure deliveryOption and address
 
   try {
     // Calculate total amount
@@ -30,7 +29,7 @@ router.post("/orders", validateOrder, async (req, res) => {
       const subtotal = item.price * item.quantity;
       totalAmount += subtotal;
       return {
-        productId: item.id,  // Use item.productId if that's the field in your cart item
+        productId: item.id,
         name: item.name,
         price: item.price,
         quantity: item.quantity,
@@ -39,11 +38,13 @@ router.post("/orders", validateOrder, async (req, res) => {
       };
     });
 
-    // Create new order
+    // Create new order with delivery option and address
     const newOrder = new Order({
       userId,
       items: orderItems,
       totalAmount,
+      deliveryOption, // Add delivery option
+      address: deliveryOption === "home" ? address : "", // Add address if home delivery
     });
 
     // Save order to the database
@@ -58,6 +59,7 @@ router.post("/orders", validateOrder, async (req, res) => {
     return res.status(500).json({ error: "Server error", details: err.message });
   }
 });
+
 
 // Get list of orders for a particular user
 router.get("/orders/:userId", async (req, res) => {
