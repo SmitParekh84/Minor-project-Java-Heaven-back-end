@@ -7,17 +7,14 @@ import { body, validationResult } from "express-validator"; // For input validat
 const router = express.Router();
 
 // Login a user
-router.post("/login", [
-    body('password').notEmpty().withMessage("Password is required"),
-    body('email').optional().isEmail().withMessage("Must be a valid email"),
-    body('mobno').optional().isNumeric().withMessage("Must be a valid mobile number"),
-    body('username').optional().notEmpty().withMessage("Username is required"),
-], async (req, res) => {
-    const { email, password, mobno, username } = req.body;
+// auth.js
+router.post("/login", async (req, res) => {
+    const { identifier, password } = req.body;
 
-    // Validate that at least one identifier is provided
-    if (!email && !mobno && !username) {
-        return res.status(400).json({ msg: "Email, mobile number, or username is required" });
+
+    // Validate that identifier and password are provided
+    if (!identifier || !password) {
+        return res.status(400).json({ msg: "Identifier and password are required" });
     }
 
     const errors = validationResult(req);
@@ -27,7 +24,13 @@ router.post("/login", [
 
     try {
         // Create a query to find the user by email, mobile number, or username
-        const query = email ? { email } : mobno ? { mobno } : { username };
+        const query = {
+            $or: [
+                { email: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+                { mobno: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+                { username: { $regex: new RegExp(`^${identifier}$`, 'i') } }
+            ]
+        };
 
         // Check if the user exists
         const user = await User.findOne(query);
