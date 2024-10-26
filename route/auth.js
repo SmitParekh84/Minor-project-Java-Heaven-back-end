@@ -8,16 +8,22 @@ const router = express.Router();
 // Login a user
 // auth.js
 router.post("/login", async (req, res) => {
-    const { email, password, mobno, username } = req.body;
+    const { identifier, password } = req.body;
 
-    // Validate that at least one identifier is provided
-    if (!email && !mobno && !username) {
-        return res.status(400).json({ msg: "Email, mobile number, or username is required" });
+    // Validate that identifier and password are provided
+    if (!identifier || !password) {
+        return res.status(400).json({ msg: "Identifier and password are required" });
     }
 
     try {
         // Create a query to find the user by email, mobile number, or username
-        const query = email ? { email } : mobno ? { mobno } : { username };
+        const query = {
+            $or: [
+                { email: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+                { mobno: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+                { username: { $regex: new RegExp(`^${identifier}$`, 'i') } }
+            ]
+        };
 
         // Check if the user exists
         const user = await User.findOne(query);
