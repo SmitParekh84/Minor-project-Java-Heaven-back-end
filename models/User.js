@@ -30,13 +30,19 @@ const userSchema = new mongoose.Schema({
     default: Date.now,
   },
   address: {
-      type: String,
-      required: false,
-    },
-    
-  
+    type: String,
+    required: false,
+  },
+cart: [
+    {
+      itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' }, // Reference to Item model
+      size: { type: String, required: true }, // Size of the item
+      quantity: { type: Number, default: 1 }, // Quantity of the item
+    }
+  ],
 
-})
+
+});
 
 // Ensure to use the model only if it hasn't been defined yet
 const User = mongoose.models.User || mongoose.model("User", userSchema)

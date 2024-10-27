@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import User from "../models/User.js"; // Assuming User model is defined in this path
 import { v4 as uuidv4 } from "uuid"; // Import UUID for generating session IDs
 import { body, validationResult } from "express-validator"; // For input validation
-
+import jwt from 'jsonwebtoken';
 const router = express.Router();
 
 // Login a user
@@ -11,15 +11,9 @@ const router = express.Router();
 router.post("/login", async (req, res) => {
     const { identifier, password } = req.body;
 
-
     // Validate that identifier and password are provided
     if (!identifier || !password) {
         return res.status(400).json({ msg: "Identifier and password are required" });
-    }
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
     }
 
     try {
@@ -28,7 +22,8 @@ router.post("/login", async (req, res) => {
             $or: [
                 { email: { $regex: new RegExp(`^${identifier}$`, 'i') } },
                 { mobno: { $regex: new RegExp(`^${identifier}$`, 'i') } },
-                { username: { $regex: new RegExp(`^${identifier}$`, 'i') } }
+                { username: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+                { address: { $regex: new RegExp(`^${identifier}$`, 'i') } }
             ]
         };
 
@@ -43,16 +38,31 @@ router.post("/login", async (req, res) => {
         if (!isMatch) {
             return res.status(400).json({ msg: "Invalid credentials" });
         }
-
         const sessionId = uuidv4(); // Generate a new session ID
+        // Create a JWT token and include the mobile number
+        const token = jwt.sign(
+            {
+                userId: user._id,
+                username: user.username,
+                email: user.email,
+                mobno: user.mobno,
+                address: user.address // Include mobile number in the token
+            },
+            process.env.JWT_SECRET, // Your secret key
+            { expiresIn: '1h' } // Token expiration
+        );
 
-        // Send session ID and user info (username and email)
+        // Send the token and user info in the response
         res.status(200).json({
             msg: "Login successful",
             sessionId,
+            token,
             user: {
+                _id: user._id, // Ensure _id is included
                 username: user.username,
                 email: user.email,
+                mobno: user.mobno,
+                address: user.address// Include mobile number in the response
             },
         });
     } catch (err) {
@@ -160,9 +170,11 @@ router.post("/admin/login", [
             msg: "Login successful.",
             sessionId,
             admin: {
+                _id: user._id, // Ensure _id is included
                 username: admin.username,
                 email: admin.email,
                 role: admin.role,
+                mobno: admin.mobno
             },
         });
     } catch (error) {
