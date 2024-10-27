@@ -170,11 +170,9 @@ router.post("/admin/login", [
             msg: "Login successful.",
             sessionId,
             admin: {
-                _id: user._id, // Ensure _id is included
                 username: admin.username,
                 email: admin.email,
-                role: admin.role,
-                mobno: admin.mobno
+                role: admin.role
             },
         });
     } catch (error) {
