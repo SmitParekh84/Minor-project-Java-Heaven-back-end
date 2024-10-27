@@ -52,13 +52,20 @@ const getAggregatedData = async () => {
     return { dailyData, yearlyData, usersPerMonth };
 };
 
+
+// New function to count delivered orders
+const countDeliveredOrders = async () => {
+    return await Order.countDocuments({ status: 'Delivered' });
+};
 // Endpoint to get dashboard statistics
 // Endpoint to get dashboard statistics with differentiation for delivery options
 router.get('/dashboard', async (req, res) => {
     try {
         // Fetch total number of delivered orders
-        const totalOrders = await Order.countDocuments({ status: 'Delivered' });
-
+        const totalOrders = await Order.countDocuments({
+            status: { $in: ["Pending", "Delivered", "Cancelled"] }
+        });
+        const totalDeliveredOrders = await Order.countDocuments({ status: 'Delivered' })
         // Fetch total number of users
         const totalUsers = await User.countDocuments();
 
@@ -152,9 +159,11 @@ router.get('/dashboard', async (req, res) => {
             totalSales: option.totalSales
         }));
 
+
         res.status(200).json({
             status: 'success',
             data: {
+                totalDeliveredOrders: totalDeliveredOrders, // Include total delivered orders count
                 totalOrders,
                 totalUsers,
                 totalSales,
