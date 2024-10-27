@@ -52,13 +52,20 @@ const getAggregatedData = async () => {
     return { dailyData, yearlyData, usersPerMonth };
 };
 
+
+// New function to count delivered orders
+const countDeliveredOrders = async () => {
+    return await Order.countDocuments({ status: 'Delivered' });
+};
 // Endpoint to get dashboard statistics
+// Endpoint to get dashboard statistics with differentiation for delivery options
 router.get('/dashboard', async (req, res) => {
     try {
         // Fetch total number of delivered orders
-        const totalOrders = await Order.countDocuments({ status: 'Delivered' });
-        console.log("Total Orders:", totalOrders);
-
+        const totalOrders = await Order.countDocuments({
+            status: { $in: ["Pending", "Delivered", "Cancelled"] }
+        });
+        const totalDeliveredOrders = await Order.countDocuments({ status: 'Delivered' })
         // Fetch total number of users
         const totalUsers = await User.countDocuments();
         console.log("Total Users:", totalUsers);
@@ -124,15 +131,59 @@ router.get('/dashboard', async (req, res) => {
             totalSales: monthData.totalSales
         }));
 
-        // Send data in response
+        // Fetch monthly user data based on the createdAt field
+        const usersPerMonth = await User.aggregate([
+            {
+                $group: {
+                    _id: { $month: '$createdAt' }, // Group by month
+                    totalUsers: { $sum: 1 }, // Count users registered in each month
+                }
+            },
+            { $sort: { '_id': 1 } } // Sort by month (1 to 12)
+        ]);
+
+        // Format the monthly user data
+        const monthlyUsers = usersPerMonth.map(userData => ({
+            month: MONTHS[userData._id - 1], // Convert month number to name
+            totalUsers: userData.totalUsers
+        }));
+
+        const { dailyData, yearlyData } = await getAggregatedData();
+
+        // Add aggregation based on delivery options
+        const deliveryOptionData = await Order.aggregate([
+            { $match: { status: 'Delivered' } }, // Only consider delivered orders
+            {
+                $group: {
+                    _id: '$deliveryOption', // Group by deliveryOption field
+                    totalOrders: { $sum: 1 }, // Count orders for each delivery option
+                    totalSales: { $sum: '$totalAmount' } // Sum up sales for each delivery option
+                }
+            }
+        ]);
+
+        // Format the delivery option data
+        const formattedDeliveryOptionData = deliveryOptionData.map(option => ({
+            deliveryOption: option._id,
+            totalOrders: option.totalOrders,
+            totalSales: option.totalSales
+        }));
+
+
         res.status(200).json({
             status: 'success',
             data: {
+                totalDeliveredOrders: totalDeliveredOrders, // Include total delivered orders count
                 totalOrders,
                 totalUsers,
                 totalSales,
-                formattedDeliveryData,
-                monthlyData,
+                bestSellingItems,
+                monthlyData, // Send the monthly order data to the frontend
+                monthlyUsers, // Send the monthly user data to the frontend
+                dailyData, // New daily data
+                yearlyData, // New yearly data
+                usersPerMonth,
+                deliveryOptionData: formattedDeliveryOptionData // Add delivery option data
             }
         });
     } catch (err) {
