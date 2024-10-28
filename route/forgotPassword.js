@@ -111,7 +111,7 @@ router.post(
 router.post(
     "/reset-password",
     body("otp").isLength({ min: 6, max: 6 }).withMessage("OTP must be 6 digits"),
-    body("newPassword").isLength({ min: 8 }).withMessage("Password must be at least 8 characters"),
+    body("newPassword").isLength({ min: 6 }).withMessage("Password must be at least 6 characters"),
     async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
