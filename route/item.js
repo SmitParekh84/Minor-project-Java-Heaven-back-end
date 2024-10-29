@@ -33,7 +33,16 @@ router.get("/", async (req, res) => {
         res.status(500).json({ error: "Server error", details: err.message });
     }
 });
-
+// In your Express routes file
+router.get("/uniq/categories", async (req, res) => {
+    try {
+        const categories = await Item.distinct("category"); // Get unique categories
+        res.status(200).json(categories);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: "Server error", details: err.message });
+    }
+});
 // Get an item by ID
 router.get("/:id", validateItemId, async (req, res) => {
     const { id } = req.params; // Extract the ID from the URL parameters
@@ -149,5 +158,6 @@ router.delete("/:id", validateItemId, async (req, res) => {
         res.status(500).json({ error: "Server error", details: err.message });
     }
 });
+
 
 export default router;
