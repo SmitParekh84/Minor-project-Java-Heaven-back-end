@@ -8,7 +8,7 @@ import morgan from "morgan";
 import mongoSanitize from "express-mongo-sanitize";
 import xss from "xss-clean";
 import hpp from "hpp";
-import rateLimit from "express-rate-limit";
+
 import compression from "compression";
 import signupRoute from "./route/signup.js";
 import itemRoute from "./route/item.js";
@@ -29,13 +29,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// Rate Limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
-  message: "Too many requests from this IP, please try again after 15 minutes",
-});
-app.use(limiter);
+
 
 // Enable CORS
 app.use(cors({

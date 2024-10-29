@@ -33,6 +33,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: false,
   },
+  sessionId: { type: String, default: null },
 cart: [
     {
       itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' }, // Reference to Item model

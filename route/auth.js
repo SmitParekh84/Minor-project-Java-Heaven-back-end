@@ -4,11 +4,28 @@ import User from "../models/User.js"; // Assuming User model is defined in this 
 import { v4 as uuidv4 } from "uuid"; // Import UUID for generating session IDs
 import { body, validationResult } from "express-validator"; // For input validation
 import jwt from 'jsonwebtoken';
+import rateLimit from "express-rate-limit";
 const router = express.Router();
+// Rate Limiting
+const loginLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 5, // Limit each IP to 5 login attempts per windowMs
+    standardHeaders: true, // Return rate limit info in the RateLimit-* headers
+    legacyHeaders: false, // Disable the X-RateLimit-* headers
+
+    handler: (req, res) => {
+        const retryAfter = Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000) || 60; // Default to 60 seconds if undefined
+
+        res.status(429).json({
+            msg: `Too many login attempts. Please try again in ${retryAfter} seconds.`
+        });
+    }
+});
+
 
 // Login a user
 // auth.js
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
     const { identifier, password } = req.body;
 
     // Validate that identifier and password are provided
@@ -38,6 +55,7 @@ router.post("/login", async (req, res) => {
         if (!isMatch) {
             return res.status(400).json({ msg: "Invalid credentials" });
         }
+
         const sessionId = uuidv4(); // Generate a new session ID
         // Create a JWT token and include the mobile number
         const token = jwt.sign(
