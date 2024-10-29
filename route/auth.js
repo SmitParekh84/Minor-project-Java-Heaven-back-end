@@ -4,20 +4,37 @@ import User from "../models/User.js"; // Assuming User model is defined in this 
 import { v4 as uuidv4 } from "uuid"; // Import UUID for generating session IDs
 import { body, validationResult } from "express-validator"; // For input validation
 import jwt from 'jsonwebtoken';
+import rateLimit from "express-rate-limit";
 const router = express.Router();
 
-// Login a user
-// auth.js
-router.post("/login", async (req, res) => {
+
+const loginLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 5, // Limit each IP to 5 login attempts per windowMs
+    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+
+    handler: (req, res) => {
+        const retryAfter = Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000) || 60; // Default to 60 seconds if undefined
+
+        res.status(429).json({
+            msg: `Too many login attempts. Please try again after ${retryAfter} seconds.`
+        });
+    }
+});
+
+
+// Login Route
+router.post("/login", loginLimiter, async (req, res) => {
     const { identifier, password } = req.body;
 
-    // Validate that identifier and password are provided
+    // Validate input
     if (!identifier || !password) {
         return res.status(400).json({ msg: "Identifier and password are required" });
     }
 
     try {
-        // Create a query to find the user by email, mobile number, or username
+        // Query to find the user
         const query = {
             $or: [
                 { email: { $regex: new RegExp(`^${identifier}$`, 'i') } },
@@ -27,7 +44,7 @@ router.post("/login", async (req, res) => {
             ]
         };
 
-        // Check if the user exists
+        // Find the user
         const user = await User.findOne(query);
         if (!user) {
             return res.status(400).json({ msg: "Invalid credentials" });
@@ -38,31 +55,46 @@ router.post("/login", async (req, res) => {
         if (!isMatch) {
             return res.status(400).json({ msg: "Invalid credentials" });
         }
-        const sessionId = uuidv4(); // Generate a new session ID
-        // Create a JWT token and include the mobile number
+
+        // Check if the user already has an active session
+        if (user.sessionId) {
+            return res.status(403).json({ msg: "User already logged in from another session." });
+        }
+
+        const sessionId = uuidv4(); // Generate session ID
+
+        // Save session data
+        req.session.userId = user._id.toString();
+        req.session.username = user.username;
+        user.sessionId = sessionId; 
+        await user.save();
+
+        // Generate a JWT
         const token = jwt.sign(
             {
                 userId: user._id,
                 username: user.username,
                 email: user.email,
                 mobno: user.mobno,
-                address: user.address // Include mobile number in the token
+                address: user.address
             },
-            process.env.JWT_SECRET, // Your secret key
-            { expiresIn: '1h' } // Token expiration
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
         );
 
-        // Send the token and user info in the response
+        // Respond with session and token data
         res.status(200).json({
             msg: "Login successful",
             sessionId,
             token,
+            userId: req.session.userId, // Explicitly send back userId
+            username: req.session.username,
             user: {
-                _id: user._id, // Ensure _id is included
+                _id: user._id,
                 username: user.username,
                 email: user.email,
                 mobno: user.mobno,
-                address: user.address// Include mobile number in the response
+                address: user.address
             },
         });
     } catch (err) {
@@ -71,16 +103,52 @@ router.post("/login", async (req, res) => {
     }
 });
 
-// Logout user and destroy the session
-router.post("/logout", (req, res) => {
-    // Implement session destruction logic if using sessions
-    req.session.destroy((err) => {
-        if (err) {
-            return res.status(500).json({ msg: "Logout failed" });
+
+router.post("/logout", async (req, res) => {
+    // Get userId from the request body
+    const { userId } = req.body;
+    console.log("User ID:", userId);
+
+    // If no userId is provided, return an error
+    if (!userId) {
+        return res.status(400).json({ msg: "No active session found." });
+    }
+
+    try {
+        // Find the user by userId in the database
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ msg: "User not found." });
         }
-        res.status(200).json({ msg: "Logout successful" });
-    });
+
+        // Clear session ID in the database
+        user.sessionId = null;
+        await user.save();
+
+        // Prepare user information to send in response
+        const userInfo = {
+            _id: user._id,
+            username: user.username,
+            email: user.email,
+            mobno: user.mobno,
+            address: user.address,
+        };
+
+        // Destroy the session on the server
+        req.session.destroy((err) => {
+            if (err) {
+                return res.status(500).json({ msg: "Failed to logout." });
+            }
+            res.status(200).json({ msg: "Logout successful.", user: userInfo });
+        });
+    } catch (err) {
+        console.error("Error during logout:", err);
+        res.status(500).json({ msg: "Server error." });
+    }
 });
+
+
+
 
 // Admin registration endpoint
 router.post("/admin/add", [
