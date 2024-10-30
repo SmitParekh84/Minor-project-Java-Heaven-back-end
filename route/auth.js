@@ -41,8 +41,8 @@ router.post("/login", loginLimiter, async (req, res) => {
             $or: [
                 { email: { $regex: new RegExp(`^${identifier}$`, 'i') } },
                 { mobno: { $regex: new RegExp(`^${identifier}$`, 'i') } },
-                { username: { $regex: new RegExp(`^${identifier}$`, 'i') } },
-                { address: { $regex: new RegExp(`^${identifier}$`, 'i') } }
+                { username: { $regex: new RegExp(`^${identifier}$`, 'i') } }
+
             ]
         };
 
@@ -60,7 +60,11 @@ router.post("/login", loginLimiter, async (req, res) => {
 
         // Check if the user already has an active session
         if (user.sessionId) {
-            return res.status(403).json({ msg: "User already logged in from another session." });
+            return res.status(200).json({
+                msg: "User already logged in from another session.",
+                conflict: true, // Indicate session conflict to the frontend
+                userId: user._id.toString()
+            });
         }
 
         const sessionId = uuidv4(); // Generate session ID
@@ -68,7 +72,7 @@ router.post("/login", loginLimiter, async (req, res) => {
         // Save session data
         req.session.userId = user._id.toString();
         req.session.username = user.username;
-        user.sessionId = sessionId; 
+        user.sessionId = sessionId;
         await user.save();
 
         // Generate a JWT
@@ -106,10 +110,80 @@ router.post("/login", loginLimiter, async (req, res) => {
 });
 
 
+
+
+// Route: /logout-other-sessions
+// Logout from other sessions Route
+
+router.post("/logout-other-sessions", async (req, res) => {
+    // Get userId from the session
+    const { userId } = req.body
+    console.log("User ID:", userId);
+    if (!userId) {
+        return res.status(400).json({ msg: "User ID is required." });
+    }
+
+    try {
+        // Find the user by ID
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ msg: "User not found." });
+        }
+
+        // Clear all session data for the user to ensure they are logged out everywhere
+        user.sessionId = null; // This should work if you are not managing sessions with express-session
+        await user.save();
+
+        // Optionally clear server-side session if using express-session
+        req.session.destroy(err => {
+            if (err) {
+                console.error("Failed to destroy session:", err);
+                return res.status(500).json({ msg: "Error logging out from other sessions." });
+            }
+            res.status(200).json({ success: true, msg: "Logged out from other sessions." });
+        });
+    } catch (error) {
+        console.error("Error logging out other sessions:", error);
+        res.status(500).json({ success: false, msg: "An error occurred during logout from other sessions." });
+    }
+});
+
+// Endpoint to get userId and sessionId
+router.get("/session-info", async (req, res) => {
+    try {
+        // Check if the user is authenticated by checking the session
+        if (!req.session || !req.session.userId) {
+            return res.status(401).json({ msg: "Unauthorized access" });
+        }
+
+        // Find the user by userId from the session
+        const user = await User.findById(req.session.userId);
+
+        // Check if user exists
+        if (!user) {
+            return res.status(404).json({ msg: "User not found" });
+        }
+
+        // Respond with userId and sessionId
+        res.status(200).json({
+            userId: user._id.toString(),
+            sessionId: user.sessionId,
+        });
+    } catch (err) {
+        console.error("Error fetching session info:", err.message);
+        res.status(500).json({ msg: "Server error" });
+    }
+});
+
+
+
+
 router.post("/logout", async (req, res) => {
     // Get userId from the request body
+    // Get userId from the session
     const { userId } = req.body;
-    console.log("User ID:", userId);
+
+
 
     // If no userId is provided, return an error
     if (!userId) {

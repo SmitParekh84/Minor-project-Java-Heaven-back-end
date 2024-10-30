@@ -18,7 +18,7 @@ import forgotPasswordRoute from "./route/forgotPassword.js";
 import dashboardRoute from "./route/dashboard.js";
 import userRoute from "./route/user.js";
 import revenueRoute from './route/revenue.js';
-
+import cartRoute from './route/cart.js';
 dotenv.config();
 
 const app = express();
@@ -61,9 +61,9 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production", // Use HTTPS in production
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      secure: false, // Set to true if using HTTPS
+      secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+      maxAge: 1000 * 60 * 60 // 1 hour
     },
   })
 );
@@ -82,7 +82,7 @@ app.use("/api", forgotPasswordRoute);
 app.use("/api", dashboardRoute);
 app.use("/api", userRoute);
 app.use('/api/revenue', revenueRoute);
-
+app.use("/api", cartRoute);
 // Undefined Routes
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
