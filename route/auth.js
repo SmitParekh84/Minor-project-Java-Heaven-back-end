@@ -313,11 +313,23 @@ router.post("/admin/login", [
         req.session.username = username;
         admin.sessionId = sessionId;
         await admin.save();
-
+        // Generate a JWT
+        const token = jwt.sign(
+            {
+                userId: admin._id,
+                username: admin.username,
+                email: admin.email,
+                mobno: admin.mobno,
+                role: admin.role
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
         // Successful login
         res.status(200).json({
             msg: "Login successful.",
             sessionId,
+            token,
             userId: req.session.userId, // Explicitly send back userId
             username: req.session.username,
             admin: {
