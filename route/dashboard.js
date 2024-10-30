@@ -69,7 +69,18 @@ router.get('/dashboard', async (req, res) => {
         // Fetch total number of users
         const totalUsers = await User.countDocuments();
         console.log("Total Users:", totalUsers);
-
+        const bestSellingItems = await Order.aggregate([
+            { $unwind: '$items' }, // Flatten the items array
+            {
+                $group: {
+                    _id: '$items.productId', // Group by productId
+                    totalSold: { $sum: '$items.quantity' }, // Sum up the quantities sold
+                    name: { $first: '$items.name' }, // Get the product name
+                }
+            },
+            { $sort: { totalSold: -1 } }, // Sort by totalSold in descending order
+            { $limit: 5 } // Limit to top 5 best-selling items
+        ]);
         // Fetch delivery data for pie chart
         const deliveryData = await Order.aggregate([
             { $match: { status: 'Delivered' } },

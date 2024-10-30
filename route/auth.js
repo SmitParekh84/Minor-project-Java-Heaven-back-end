@@ -308,12 +308,20 @@ router.post("/admin/login", [
 
         // Generate a session ID
         const sessionId = uuidv4(); // Create a new session ID
+        // Save session data
+        req.session.userId = admin._id.toString();
+        req.session.username = username;
+        admin.sessionId = sessionId;
+        await admin.save();
 
         // Successful login
         res.status(200).json({
             msg: "Login successful.",
             sessionId,
+            userId: req.session.userId, // Explicitly send back userId
+            username: req.session.username,
             admin: {
+                _id: admin._id,
                 username: admin.username,
                 email: admin.email,
                 role: admin.role
