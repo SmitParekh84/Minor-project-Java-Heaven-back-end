@@ -7,14 +7,18 @@ const router = express.Router();
 
 // Validation schema for registration input
 const userSchema = Joi.object({
-  username: Joi.string().min(3).max(30).required().alphanum(), // Username validation
+  username: Joi.string().min(3).max(30).required().alphanum(),
   mobno: Joi.string()
-    .length(10)
-    .pattern(/^[0-9]+$/)
-    .required(),
+    .pattern(/^\+\d{1,3}-\d{10}$/) // Adjusted to match the country code and 10-digit format correctly
+    .required()
+    .messages({
+      'string.pattern.base': 'Mobile number must start with a country code (e.g., +1) followed by 10 digits, formatted as xxxxx-xxxxx.',
+      'string.empty': 'Mobile number is required.',
+    }),
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
 });
+
 
 // Register a new user
 router.post("/signup", async (req, res) => {
