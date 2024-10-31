@@ -93,6 +93,7 @@ router.post("/login", loginLimiter, async (req, res) => {
             msg: "Login successful",
             sessionId,
             token,
+            cartItems: user.cartItems,
             userId: req.session.userId, // Explicitly send back userId
             username: req.session.username,
             user: {

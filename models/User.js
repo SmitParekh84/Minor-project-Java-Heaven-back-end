@@ -1,5 +1,43 @@
 import mongoose from "mongoose"
-
+// Define the schema for each cart item
+const cartItemSchema = new mongoose.Schema({
+  _id: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+  },
+  name: {
+    type: String,
+    required: true,
+  },
+  category: {
+    type: String,
+  },
+  description: {
+    type: String,
+  },
+  imageUrl: {
+    type: String,
+  },
+  isBestseller: {
+    type: Boolean,
+    default: false,
+  },
+  price: {
+    type: Number,
+    required: true,
+  },
+  quantity: {
+    type: Number,
+    required: true,
+  },
+  size: {
+    type: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  }
+});
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -34,13 +72,7 @@ const userSchema = new mongoose.Schema({
     required: false,
   },
   sessionId: { type: String, default: null },
-cart: [
-    {
-      itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' }, // Reference to Item model
-      size: { type: String, required: true }, // Size of the item
-      quantity: { type: Number, default: 1 }, // Quantity of the item
-    }
-  ],
+  cartItems: [cartItemSchema],
 
 
 });
