@@ -1,7 +1,7 @@
 import express from "express";
 import User from "../models/User.js"; // Adjust the import path if necessary
 import mongoose from "mongoose"; // Import mongoose for ID validation
-
+import bcrypt from "bcrypt";
 const router = express.Router();
 
 // GET route to fetch user by ID
@@ -124,4 +124,45 @@ router.put("/users/:userId/address", async (req, res) => {
     }
 });
 
+router.put('/users/:userId', async (req, res) => {
+    const { userId } = req.params;
+    const { mobno, address } = req.body; // Use mobno here
+
+    try {
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        if (mobno) user.mobno = mobno; // Ensure matching field names
+        if (address) user.address = address;
+
+        await user.save();
+        res.json({ message: "Profile updated successfully", user });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to update profile", error });
+    }
+});
+
+
+router.put("/users/:id/password", async (req, res) => {
+    const { id } = req.params;
+    const { currentPassword, newPassword } = req.body;
+
+    try {
+        const user = await User.findById(id);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        // Verify current password
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) return res.status(400).json({ message: "Current password is incorrect" });
+
+        // Hash and set new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+
+        await user.save();
+        res.json({ message: "Password updated successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Failed to update password", error });
+    }
+});
 export default router;
