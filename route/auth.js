@@ -283,20 +283,31 @@ router.post("/admin/add", [
 });
 
 // Admin login
-router.post("/admin/login", [
-    body('username').notEmpty().withMessage("Username is Required."),
-    body('password').notEmpty().withMessage("Password is required."),
-], async (req, res) => {
-    const { username, password } = req.body;
+router.post("/admin/login", loginLimiter, async (req, res) => {
+    const { identifier, password } = req.body;
 
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+    // Validate input
+    if (!identifier || !password) {
+        return res.status(400).json({ msg: "Identifier and password are required" });
     }
 
     try {
-        // Find the admin by username
-        const admin = await User.findOne({ username, role: 'admin' });
+        // Query to find the admin user by role and identifier
+        const query = {
+            $and: [
+                { role: 'admin' },
+                {
+                    $or: [
+                        { email: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+                        { mobno: { $regex: new RegExp(`^${identifier}$`, 'i') } },
+                        { username: { $regex: new RegExp(`^${identifier}$`, 'i') } }
+                    ]
+                }
+            ]
+        };
+
+        // Find the admin
+        const admin = await User.findOne(query);
         if (!admin) {
             return res.status(400).json({ msg: "Invalid credentials." });
         }
@@ -307,13 +318,24 @@ router.post("/admin/login", [
             return res.status(400).json({ msg: "Invalid credentials." });
         }
 
+        // Check if the admin already has an active session
+        if (admin.sessionId) {
+            return res.status(200).json({
+                msg: "Admin already logged in from another session.",
+                conflict: true, // Indicate session conflict to the frontend
+                userId: admin._id.toString()
+            });
+        }
+
         // Generate a session ID
         const sessionId = uuidv4(); // Create a new session ID
+
         // Save session data
         req.session.userId = admin._id.toString();
-        req.session.username = username;
+        req.session.username = admin.username; // Assign the admin's username here
         admin.sessionId = sessionId;
         await admin.save();
+
         // Generate a JWT
         const token = jwt.sign(
             {
@@ -326,13 +348,15 @@ router.post("/admin/login", [
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
+
         // Successful login
         res.status(200).json({
-            msg: "Login successful.",
+            msg: "Admin login successful.",
             sessionId,
             token,
-            userId: req.session.userId, // Explicitly send back userId
+            userId: req.session.userId,
             username: req.session.username,
+            role: admin.role,
             admin: {
                 _id: admin._id,
                 username: admin.username,
@@ -341,10 +365,11 @@ router.post("/admin/login", [
             },
         });
     } catch (error) {
-        console.error("Error logging in admin:", error);
+        console.error("Error logging in admin:", error.message);
         res.status(500).json({ msg: "Server error", error: error.message });
     }
 });
+
 
 // Fetch all admins
 router.get("/admin/list", async (req, res) => {
