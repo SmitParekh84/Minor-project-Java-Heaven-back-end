@@ -2,6 +2,7 @@ import express from "express";
 import User from "../models/User.js"; // Adjust the import path if necessary
 import mongoose from "mongoose"; // Import mongoose for ID validation
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 const router = express.Router();
 
 // GET route to fetch user by ID
@@ -126,17 +127,30 @@ router.put("/users/:userId/address", async (req, res) => {
 
 router.put('/users/:userId', async (req, res) => {
     const { userId } = req.params;
-    const { mobno, address } = req.body; // Use mobno here
+    const { mobno, address } = req.body;
 
     try {
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ message: "User not found" });
 
-        if (mobno) user.mobno = mobno; // Ensure matching field names
+        if (mobno) user.mobno = mobno;
         if (address) user.address = address;
 
+        // Save the updated user
         await user.save();
-        res.json({ message: "Profile updated successfully", user });
+
+        // Optionally, you can re-issue a new JWT token here with the updated user data
+        const newToken = jwt.sign({ userId: user._id,
+                username: user.username,
+                email: user.email,
+                mobno: user.mobno,
+                address: user.address }, 'yourSecretKey', { expiresIn: '1h' });
+
+        res.json({
+            message: "Profile updated successfully",
+            user,
+            token: newToken,  // Send the new token
+        });
     } catch (error) {
         res.status(500).json({ message: "Failed to update profile", error });
     }
