@@ -1,6 +1,10 @@
 import express from "express";
 import Order from "../models/Order.js";
+import dotenv from "dotenv"
+import Stripe from 'stripe';
 
+dotenv.config()
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const router = express.Router();
 
 // Input validation middleware for creating an order
@@ -18,6 +22,64 @@ const validateOrder = (req, res, next) => {
 
   next();
 };
+// Route for creating Stripe checkout session
+// In your backend code
+// In your backend code
+router.post("/create-checkout-session", async (req, res) => {
+  const { cartItems, successUrl, cancelUrl } = req.body;
+
+  try {
+    const lineItems = cartItems.map(item => ({
+      price_data: {
+        currency: 'usd',
+        product_data: { name: item.name },
+        unit_amount: item.price * 100,
+      },
+      quantity: item.quantity,
+    }));
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: lineItems,
+      mode: 'payment',
+      success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`, // Add session_id in success URL
+      cancel_url: cancelUrl,
+      metadata: {
+        userId: req.body.userId, // Pass the user ID
+        cartItems: JSON.stringify(req.body.cartItems), // Convert cart items to JSON string
+        deliveryOption: req.body.deliveryOption,
+        address: req.body.address || "",
+      },
+    });
+
+    res.status(200).json({ id: session.id, url: session.url });
+  } catch (error) {
+    console.error("Error creating checkout session:", error);
+    res.status(500).json({ error: "Server error", details: error.message });
+  }
+});
+router.get("/verify-payment-session", async (req, res) => {
+  const { session_id } = req.query;
+
+  if (!session_id) {
+    return res.status(400).json({ error: "Missing session_id in query" });
+  }
+
+  try {
+    // Fetch the session from Stripe to verify the payment
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+
+    // Check if the payment was successful
+    if (session.payment_status === "paid") {
+      res.status(200).json(session);
+    } else {
+      res.status(400).json({ error: "Payment not completed" });
+    }
+  } catch (error) {
+    console.error("Error verifying payment session:", error);
+    res.status(500).json({ error: "Server error", details: error.message });
+  }
+});
 
 router.post("/orders", validateOrder, async (req, res) => {
   const { userId, cartItems, deliveryOption, address } = req.body; // Destructure deliveryOption and address
@@ -25,7 +87,8 @@ router.post("/orders", validateOrder, async (req, res) => {
   try {
     // Calculate total amount
     let totalAmount = 0;
-    const orderItems = cartItems.map((item) => {
+    const parsedCartItems = typeof cartItems === "string" ? JSON.parse(cartItems) : cartItems;
+    const orderItems = parsedCartItems.map((item) => {
       const subtotal = item.price * item.quantity;
       totalAmount += subtotal;
       return {
@@ -42,6 +105,7 @@ router.post("/orders", validateOrder, async (req, res) => {
     const newOrder = new Order({
       userId,
       items: orderItems,
+
       totalAmount,
       deliveryOption, // Add delivery option
       address: deliveryOption === "home" ? address : "", // Add address if home delivery
