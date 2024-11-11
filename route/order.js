@@ -26,12 +26,12 @@ const validateOrder = (req, res, next) => {
 // In your backend code
 // In your backend code
 router.post("/create-checkout-session", async (req, res) => {
-  const { cartItems, successUrl, cancelUrl } = req.body;
+  const { cartItems, successUrl, cancelUrl, address } = req.body;
 
   try {
     const lineItems = cartItems.map(item => ({
       price_data: {
-        currency: 'usd',
+        currency: 'inr',
         product_data: { name: item.name },
         unit_amount: item.price * 100,
       },
@@ -48,7 +48,7 @@ router.post("/create-checkout-session", async (req, res) => {
         userId: req.body.userId, // Pass the user ID
         cartItems: JSON.stringify(req.body.cartItems), // Convert cart items to JSON string
         deliveryOption: req.body.deliveryOption,
-        address: req.body.address || "",
+        address: address || "",
       },
     });
 
@@ -100,6 +100,7 @@ router.post("/orders", validateOrder, async (req, res) => {
         subtotal: subtotal,
       };
     });
+    console.log("Address:", address);
 
     // Create new order with delivery option and address
     const newOrder = new Order({
