@@ -226,61 +226,48 @@ router.post("/logout", async (req, res) => {
 
 
 
-
 // Admin registration endpoint
-router.post("/admin/add", [
-    body('username').notEmpty().withMessage("Username is required."),
-    body('password').notEmpty().withMessage("Password is required."),
-    body('mobno').notEmpty().isNumeric().withMessage("Mobile number is required."),
-    body('email').notEmpty().isEmail().withMessage("Valid email is required."),
-], async (req, res) => {
-    const { username, password, mobno, email } = req.body;
 
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+// Add new admin endpoint 
+router.post("/admin/add", async (req, res) => {
+    const { username, email, mobno, password } = req.body;
+
+    if (!username || !email || !mobno || !password) {
+        return res.status(400).json({ msg: "All fields are required." });
+    }
+
+    // Validate email and phone format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ msg: "Invalid email format." });
+    }
+    if (!phoneRegex.test(mobno)) {
+        return res.status(400).json({ msg: "Invalid mobile number format. Must be 10 digits." });
+    }
+    if (password.length < 6) {
+        return res.status(400).json({ msg: "Password must be at least 6 characters long." });
     }
 
     try {
-        // Check if a user with the same username already exists
-        const existingUser = await User.findOne({ username });
-
-        if (existingUser) {
-            // If the existing user is already an admin, return an error
-            if (existingUser.role === 'admin') {
-                return res.status(400).json({ msg: "Admin already exists." });
-            }
-
-            // If the existing user is not an admin, update their role to 'admin'
-            existingUser.role = 'admin';
-            existingUser.password = await bcrypt.hash(password, 10); // Update password if needed
-            existingUser.mobno = mobno; // Update mobile number if needed
-            existingUser.email = email; // Update email if needed
-
-            await existingUser.save();
-
-            return res.status(200).json({ msg: "User has been updated to admin." });
+        const existingAdminEmail = await User.findOne({ email });
+        const existingAdminMobno = await User.findOne({ mobno });
+        const existingAdminUserName = await User.findOne({ username });
+        if (existingAdminEmail || existingAdminMobno || existingAdminUserName) {
+            return res.status(400).json({ msg: "Admin with this username,mobile number,email already exists." });
         }
 
-        // If no user exists with the given username, create a new admin user
         const hashedPassword = await bcrypt.hash(password, 10);
-
-        const newAdmin = new User({
-            username,
-            password: hashedPassword,
-            mobno,
-            email,
-            role: 'admin',
-        });
-
+        const newAdmin = new User({ username, email, mobno, password: hashedPassword, role: 'admin' });
         await newAdmin.save();
 
-        res.status(201).json({ msg: "Admin added successfully." });
+        res.status(201).json({ msg: "Admin added successfully.", admin: newAdmin });
     } catch (error) {
-        console.error("Error adding admin:", error);
+        console.error("Error adding new admin:", error);
         res.status(500).json({ msg: "Server error", error: error.message });
     }
 });
+
 
 // Admin login
 router.post("/admin/login", loginLimiter, async (req, res) => {
@@ -392,11 +379,32 @@ router.put("/admin/edit/:id", async (req, res) => {
         return res.status(400).json({ msg: "Username, email, and mobile number are required." });
     }
 
+    // Validate email and phone format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ msg: "Invalid email format." });
+    }
+    if (!phoneRegex.test(mobno)) {
+        return res.status(400).json({ msg: "Invalid mobile number format. Must be 10 digits." });
+    }
+
     try {
+        // Check if any other admin already exists with the same username, email, or mobno except the current admin
+        const existingAdminEmail = await User.findOne({ email, _id: { $ne: adminId } });
+        const existingAdminMobno = await User.findOne({ mobno, _id: { $ne: adminId } });
+        const existingAdminUserName = await User.findOne({ username, _id: { $ne: adminId } });
+
+        if (existingAdminEmail || existingAdminMobno || existingAdminUserName) {
+            return res.status(400).json({ msg: "Admin with this username, mobile number, or email already exists." });
+        }
+
         const updateData = { username, email, mobno };
 
-        // If password is provided, hash it
         if (password) {
+            if (password.length < 6) {
+                return res.status(400).json({ msg: "Password must be at least 6 characters long." });
+            }
             const hashedPassword = await bcrypt.hash(password, 10);
             updateData.password = hashedPassword;
         }
@@ -406,21 +414,41 @@ router.put("/admin/edit/:id", async (req, res) => {
             return res.status(404).json({ msg: "Admin not found." });
         }
 
-        res.status(200).json({ msg: "Admin updated successfully." });
+        res.status(200).json({ msg: "Admin updated successfully.", admin: updatedAdmin });
     } catch (error) {
         console.error("Error updating admin:", error);
         res.status(500).json({ msg: "Server error", error: error.message });
     }
 });
 
+// Check if admin exists endpoint
+router.post("/admin/check-exists", async (req, res) => {
+    const { username, email, mobno } = req.body;
+    try {
+        const existingAdmin = await User.findOne({
+            $or: [
+                { username },
+                { email },
+                { mobno }
+            ]
+        });
+        if (existingAdmin) {
+            return res.status(200).json({ exists: true });
+        }
+        res.status(200).json({ exists: false });
+    } catch (error) {
+        console.error("Error checking if admin exists:", error);
+        res.status(500).json({ msg: "Server error", error: error.message });
+    }
+});
+
+
 // Delete an admin
 router.delete("/admin/delete/:id", async (req, res) => {
     const adminId = req.params.id;
 
     try {
-        // Find the admin by ID and remove it
         const deletedAdmin = await User.findByIdAndDelete(adminId);
-
         if (!deletedAdmin) {
             return res.status(404).json({ msg: "Admin not found." });
         }
@@ -431,5 +459,7 @@ router.delete("/admin/delete/:id", async (req, res) => {
         res.status(500).json({ msg: "Server error", error: error.message });
     }
 });
+
+
 
 export default router;
