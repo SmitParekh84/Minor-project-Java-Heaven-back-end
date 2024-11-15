@@ -66,6 +66,38 @@ router.get("/available-stock", async (req, res) => {
         return res.status(500).json({ error: "Server error", details: err.message });
     }
 });
+router.post("/check-stock", async (req, res) => {
+    const { cartItems } = req.body;
+
+    try {
+        for (const cartItem of cartItems) {
+            const { productId, quantity } = cartItem;
+
+            // Find the item in the database
+            const item = await Item.findById(productId);
+            if (!item) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Item with ID ${productId} not found.`
+                });
+            }
+
+            // Check stock availability
+            if (item.stock < quantity) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Insufficient stock for item: ${item.name}. Available: ${item.stock}, Required: ${quantity}`
+                });
+            }
+        }
+
+        // If all items are in stock
+        return res.status(200).json({ success: true });
+    } catch (err) {
+        console.error("Error checking stock:", err);
+        return res.status(500).json({ error: "Server error", details: err.message });
+    }
+});
 
 // Route to update stock (PUT)
 router.put("/update-stock/:itemId", async (req, res) => {
