@@ -83,12 +83,12 @@ router.get('/dashboard', async (req, res) => {
                 }
             },
             { $sort: { totalSold: -1 } }, // Sort by totalSold in descending order
-            { $limit: 5 } // Limit to top 5 best-selling items
+            { $limit: 30 } // Limit to top 5 best-selling items
         ]);
         // Calculate total items in Pending, Delivered, and Cancelled orders
         const totalItemsOrders = await Order.aggregate([
             {
-                $match: { status: { $in: ["Pending", "Delivered", "Cancelled"] } } // Only consider orders with specific statuses
+                $match: { status: { $in: ["Delivered"] } } // Only consider orders with specific statuses
             },
             {
                 $unwind: '$items' // Flatten the items array
