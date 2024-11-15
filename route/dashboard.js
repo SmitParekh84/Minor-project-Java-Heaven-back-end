@@ -100,7 +100,16 @@ router.get('/dashboard', async (req, res) => {
                 }
             }
         ]);
-
+        // Recent orders in the last 7 days
+        const recentOrders = await Order.find({
+            createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 7)) } // Orders in the last 7 days
+        }).sort({ createdAt: -1 }).limit(10); // Limit to 10 most recent orders
+        // Purchase frequency (how often customers place orders)
+        const purchaseFrequency = await Order.aggregate([
+            { $match: { status: 'Delivered' } },
+            { $group: { _id: '$userId', totalOrders: { $sum: 1 } } }, // Group by user and count orders
+            { $match: { totalOrders: { $gt: 1 } } } // Only consider users who made more than one order
+        ]);
         const totalItemsSold = totalItemsOrders[0]?.totalItemsSold || 0; // Safely access total sold items
         // Calculate total items sold across all orders
         const totalItemsPending = await Order.aggregate([
@@ -227,6 +236,8 @@ router.get('/dashboard', async (req, res) => {
                 totalPendingOrders,
                 totalOrders,
                 totalItemsOrders: totalItemsSold, // Add total items sold to response
+                recentOrders, // New: Most recent orders in the last 7 days
+                purchaseFrequency, // New: Customer purchase frequency
                 totalUsers,
                 totalSales,
                 bestSellingItems,
@@ -236,6 +247,7 @@ router.get('/dashboard', async (req, res) => {
                 dailyData, // New daily data
                 yearlyData, // New yearly data
                 usersPerMonth,
+
                 deliveryOptionData: formattedDeliveryOptionData // Add delivery option data
             }
         });
