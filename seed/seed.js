@@ -1,6 +1,6 @@
 import mongoose from "mongoose"
 import dotenv from "dotenv"
-import Item from "./models/Item.js" // Adjust the path based on your structure
+import Item from "../models/Item.js" // Adjust the path based on your structure
 
 dotenv.config()
 

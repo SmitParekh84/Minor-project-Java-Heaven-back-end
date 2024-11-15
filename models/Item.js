@@ -30,6 +30,10 @@ const ItemSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  stock: {
+    type: Number,
+    required: false, // Make it optional; change to true if it should be required
+  },
 })
 
 // Create the Item model

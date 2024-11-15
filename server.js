@@ -19,6 +19,7 @@ import dashboardRoute from "./route/dashboard.js";
 import userRoute from "./route/user.js";
 import revenueRoute from './route/revenue.js';
 import cartRoute from './route/cart.js';
+import stockRoute from './route/stock.js'
 dotenv.config();
 
 const app = express();
@@ -78,6 +79,7 @@ app.use("/api", authRoute);
 app.use("/api", signupRoute);
 app.use("/api/items", itemRoute);
 app.use("/api", orderRoute);
+app.use("/api/stock", stockRoute);
 app.use("/api", forgotPasswordRoute);
 app.use("/api", dashboardRoute);
 app.use("/api", userRoute);

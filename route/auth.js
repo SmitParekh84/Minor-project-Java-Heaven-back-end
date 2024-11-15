@@ -348,7 +348,9 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
                 _id: admin._id,
                 username: admin.username,
                 email: admin.email,
-                role: admin.role
+                role: admin.role,
+                mobno: admin.mobno,
+                address: admin.address
             },
         });
     } catch (error) {

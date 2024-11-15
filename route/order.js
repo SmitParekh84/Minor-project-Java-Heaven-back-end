@@ -1,7 +1,9 @@
 import express from "express";
 import Order from "../models/Order.js";
+import Item from "../models/Item.js";
 import dotenv from "dotenv"
 import Stripe from 'stripe';
+
 
 dotenv.config()
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -114,7 +116,17 @@ router.post("/orders", validateOrder, async (req, res) => {
 
     // Save order to the database
     await newOrder.save();
-
+    // Deduct stock for each item in the order
+    for (const orderItem of orderItems) {
+      const item = await Item.findById(orderItem.productId);  // Find the item in the Item collection
+      if (item) {
+        // Decrease stock based on quantity in the order
+        item.stock -= orderItem.quantity;
+        // Ensure stock doesn't go below 0
+        if (item.stock < 0) item.stock = 0;
+        await item.save(); // Save updated item
+      }
+    }
     return res.status(201).json({
       message: "Order placed successfully",
       order: newOrder,
