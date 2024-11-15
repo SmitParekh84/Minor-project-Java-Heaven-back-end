@@ -86,7 +86,7 @@ router.post("/check-stock", async (req, res) => {
             if (item.stock < quantity) {
                 return res.status(400).json({
                     success: false,
-                    message: `Insufficient stock for item: ${item.name}. Available: ${item.stock}, Required: ${quantity}`
+                    message: `We're sorry, but we currently don't have enough stock for "${item.name}". Available quantity: ${item.stock}. You requested: ${quantity}. Please adjust your order and try again.`
                 });
             }
         }
