@@ -103,7 +103,7 @@ router.get('/dashboard', async (req, res) => {
         // Recent orders in the last 7 days
         const recentOrders = await Order.find({
             createdAt: { $gte: new Date(new Date().setDate(new Date().getDate() - 7)) } // Orders in the last 7 days
-        }).sort({ createdAt: -1 }).limit(10); // Limit to 10 most recent orders
+        }).sort({ createdAt: -1 }).limit(500); // Limit to 10 most recent orders
         // Purchase frequency (how often customers place orders)
         const purchaseFrequency = await Order.aggregate([
             { $match: { status: 'Delivered' } },
