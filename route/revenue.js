@@ -1,52 +1,45 @@
-// src/routes/revenue.js
 import express from 'express';
 import Order from '../models/Order.js';
+import { authenticate, requireAdmin } from '../middleware/auth.js';
+import asyncHandler from '../middleware/asyncHandler.js';
+import { ORDER_STATUS } from '../constants/orderStatus.js';
 
 const router = express.Router();
 
 const MONTHS = [
-    'January', 'February', 'March', 'April', 'May', 'June', 
-    'July', 'August', 'September', 'October', 'November', 'December'
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-router.get('/', async (req, res) => {
-    try {
-        const monthlySalesData = await Order.aggregate([
-            { $match: { isDelivered: true } },
-            { $group: { _id: { $month: '$createdAt' }, totalSales: { $sum: '$totalAmount' } } },
-            { $sort: { '_id': 1 } }
-        ]);
+// GET /api/revenue — admin only; fixed query uses status field (not isDelivered which doesn't exist)
+router.get('/', authenticate, requireAdmin, asyncHandler(async (req, res) => {
+  const [monthlySalesData, deliveryRevenueData] = await Promise.all([
+    Order.aggregate([
+      { $match: { status: ORDER_STATUS.DELIVERED } },
+      { $group: { _id: { $month: '$createdAt' }, totalSales: { $sum: '$totalAmount' } } },
+      { $sort: { _id: 1 } },
+    ]),
+    Order.aggregate([
+      { $match: { status: ORDER_STATUS.DELIVERED } },
+      { $group: { _id: '$deliveryOption', totalSales: { $sum: '$totalAmount' } } },
+    ]),
+  ]);
 
-        const formattedData = monthlySalesData.map(monthData => ({
-            month: MONTHS[monthData._id - 1],
-            totalSales: monthData.totalSales
-        }));
+  const revenueData = monthlySalesData.map((m) => ({
+    month: MONTHS[m._id - 1],
+    totalSales: m.totalSales,
+  }));
 
-        const totalRevenue = formattedData.reduce((acc, item) => acc + item.totalSales, 0);
+  const totalRevenue = revenueData.reduce((acc, item) => acc + item.totalSales, 0);
 
-        // Additional aggregation for revenue by delivery type
-        const deliveryRevenueData = await Order.aggregate([
-            { $match: { isDelivered: true } },
-            { $group: { _id: '$deliveryOption', totalSales: { $sum: '$totalAmount' } } }
-        ]);
-
-        const formattedDeliveryData = deliveryRevenueData.map(data => ({
-            deliveryType: data._id,
-            totalSales: data.totalSales
-        }));
-
-        res.json({
-            status: 'success',
-            data: {
-                totalRevenue,
-                revenueData: formattedData,
-                deliveryData: formattedDeliveryData,  // Added for pie chart
-            },
-        });
-    } catch (err) {
-        console.error("Error fetching revenue data:", err.message);
-        res.status(500).json({ status: 'error', message: 'Server error' });
-    }
-});
+  res.json({
+    success: true,
+    data: {
+      totalRevenue,
+      revenueData,
+      deliveryData: deliveryRevenueData.map((d) => ({ deliveryType: d._id, totalSales: d.totalSales })),
+    },
+  });
+}));
 
 export default router;
