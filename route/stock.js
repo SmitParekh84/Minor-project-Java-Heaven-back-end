@@ -1,126 +1,95 @@
 import express from 'express';
-import Item from '../models/Item.js';  // Assuming Item model is in models/Item.js
-import Order from '../models/Order.js';  // Assuming Order model is in models/Order.js
+import Item from '../models/Item.js';
+import Order from '../models/Order.js';
+import { authenticate, requireAdmin } from '../middleware/auth.js';
+import asyncHandler from '../middleware/asyncHandler.js';
+import { ORDER_STATUS } from '../constants/orderStatus.js';
 
 const router = express.Router();
 
-// Route to update stock when an order is placed and delivered
-router.post("/update-stock", async (req, res) => {
-    const { orderId } = req.body;
+// GET /api/stock/available-stock — public read
+router.get('/available-stock', asyncHandler(async (req, res) => {
+  const items = await Item.find().select('name stock');
+  const availableStock = items.map((item) => ({ name: item.name, stock: item.stock }));
+  return res.status(200).json({ success: true, availableStock });
+}));
 
-    try {
-        // Find the order by its ID
-        const order = await Order.findById(orderId);
-        if (!order) {
-            return res.status(404).json({ message: "Order not found" });
-        }
+// POST /api/stock/check-stock — public pre-flight check; read-only
+router.post('/check-stock', asyncHandler(async (req, res) => {
+  const { cartItems } = req.body;
 
-        // Check if the order is delivered
-        if (order.status !== 'Delivered') {
-            return res.status(400).json({ message: "Order is not delivered yet" });
-        }
+  if (!Array.isArray(cartItems) || cartItems.length === 0) {
+    return res.status(400).json({ success: false, msg: 'cartItems must be a non-empty array' });
+  }
 
-        // Loop through each item in the order and update stock
-        for (const orderItem of order.items) {
-            const { productId, quantity } = orderItem;
-
-            // Find the item in the Item model
-            const item = await Item.findById(productId);
-            if (!item) {
-                return res.status(404).json({ message: `Item with ID ${productId} not found` });
-            }
-
-            // Ensure there is enough stock to fulfill the order
-            if (item.stock < quantity) {
-                return res.status(400).json({
-                    message: `Not enough stock for item: ${item.name}, available: ${item.stock}, required: ${quantity}`,
-                });
-            }
-
-            // Update the stock by subtracting the ordered quantity
-            item.stock -= quantity;
-            await item.save();
-        }
-
-        return res.status(200).json({ message: "Stock updated successfully" });
-    } catch (err) {
-        console.error("Error updating stock:", err);
-        return res.status(500).json({ error: "Server error", details: err.message });
+  for (const cartItem of cartItems) {
+    const { productId, quantity } = cartItem;
+    if (!productId || !quantity) {
+      return res.status(400).json({ success: false, msg: 'Each cartItem must have productId and quantity' });
     }
-});
-// Route to get available stock for all items
-router.get("/available-stock", async (req, res) => {
-    try {
-        // Fetch all items from the database
-        const items = await Item.find();
 
-        // Create an array to hold the available stock for each item
-        const availableStock = items.map(item => ({
-            name: item.name,
-            stock: item.stock
-        }));
-
-        return res.status(200).json({ availableStock });
-    } catch (err) {
-        console.error("Error fetching available stock:", err);
-        return res.status(500).json({ error: "Server error", details: err.message });
+    const item = await Item.findById(productId);
+    if (!item) {
+      return res.status(404).json({ success: false, msg: `Item ${productId} not found` });
     }
-});
-router.post("/check-stock", async (req, res) => {
-    const { cartItems } = req.body;
 
-    try {
-        for (const cartItem of cartItems) {
-            const { productId, quantity } = cartItem;
-
-            // Find the item in the database
-            const item = await Item.findById(productId);
-            if (!item) {
-                return res.status(404).json({
-                    success: false,
-                    message: `Item with ID ${productId} not found.`
-                });
-            }
-
-            // Check stock availability
-            if (item.stock < quantity) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Sorry, we don't have enough stock for "${item.name}" to fulfill your order. Please adjust the quantity and try again.`
-                });
-            }
-        }
-
-        // If all items are in stock
-        return res.status(200).json({ success: true });
-    } catch (err) {
-        console.error("Error checking stock:", err);
-        return res.status(500).json({ error: "Server error", details: err.message });
+    if (item.stock < quantity) {
+      return res.status(400).json({
+        success: false,
+        msg: `Insufficient stock for "${item.name}". Available: ${item.stock}, requested: ${quantity}.`,
+      });
     }
-});
+  }
 
-// Route to update stock (PUT)
-router.put("/update-stock/:itemId", async (req, res) => {
-    const { itemId } = req.params; // Item ID passed as a parameter
-    const { stock } = req.body; // New stock value to be updated
+  return res.status(200).json({ success: true });
+}));
 
-    try {
-        // Find the item by its ID
-        const item = await Item.findById(itemId);
-        if (!item) {
-            return res.status(404).json({ message: `Item with ID ${itemId} not found` });
-        }
+// POST /api/stock/update-stock — admin only; atomic update via findOneAndUpdate
+router.post('/update-stock', authenticate, requireAdmin, asyncHandler(async (req, res) => {
+  const { orderId } = req.body;
 
-        // Update the stock value
-        item.stock = stock;
+  const order = await Order.findById(orderId);
+  if (!order) return res.status(404).json({ success: false, msg: 'Order not found' });
 
-        // Save the updated item to the database
-        await item.save();
+  if (order.status !== ORDER_STATUS.DELIVERED) {
+    return res.status(400).json({ success: false, msg: 'Order is not delivered yet' });
+  }
 
-        return res.status(200).json({ message: "Stock updated successfully", item });
-    } catch (err) {
-        console.error("Error updating stock:", err);
-        return res.status(500).json({ error: "Server error", details: err.message });
+  const decremented = [];
+  for (const orderItem of order.items) {
+    const updated = await Item.findOneAndUpdate(
+      { _id: orderItem.productId, stock: { $gte: orderItem.quantity } },
+      { $inc: { stock: -orderItem.quantity } },
+      { new: true }
+    );
+    if (!updated) {
+      for (const d of decremented) {
+        await Item.findByIdAndUpdate(d.productId, { $inc: { stock: d.quantity } });
+      }
+      return res.status(400).json({
+        success: false,
+        msg: `Insufficient stock for item ${orderItem.productId}`,
+      });
     }
-});
+    decremented.push({ productId: orderItem.productId, quantity: orderItem.quantity });
+  }
+
+  return res.status(200).json({ success: true, msg: 'Stock updated successfully' });
+}));
+
+// PUT /api/stock/update-stock/:itemId — admin only
+router.put('/update-stock/:itemId', authenticate, requireAdmin, asyncHandler(async (req, res) => {
+  const { itemId } = req.params;
+  const { stock } = req.body;
+
+  if (stock === undefined || stock < 0) {
+    return res.status(400).json({ success: false, msg: 'stock must be a non-negative number' });
+  }
+
+  const item = await Item.findByIdAndUpdate(itemId, { stock }, { new: true });
+  if (!item) return res.status(404).json({ success: false, msg: 'Item not found' });
+
+  return res.status(200).json({ success: true, msg: 'Stock updated successfully', item });
+}));
+
 export default router;

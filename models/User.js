@@ -1,83 +1,36 @@
-import mongoose from "mongoose"
-// Define the schema for each cart item
+import mongoose from 'mongoose';
+
 const cartItemSchema = new mongoose.Schema({
-  _id: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-  },
-  name: {
-    type: String,
-    required: true,
-  },
-  category: {
-    type: String,
-  },
-  description: {
-    type: String,
-  },
-  imageUrl: {
-    type: String,
-  },
-  isBestseller: {
-    type: Boolean,
-    default: false,
-  },
-  price: {
-    type: Number,
-    required: true,
-  },
-  quantity: {
-    type: Number,
-    required: true,
-  },
-  size: {
-    type: String,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  }
+  _id: { type: mongoose.Schema.Types.ObjectId, required: true },
+  name: { type: String, required: true },
+  category: { type: String },
+  description: { type: String },
+  imageUrl: { type: String },
+  isBestseller: { type: Boolean, default: false },
+  price: { type: Number, required: true },
+  quantity: { type: Number, required: true },
+  size: { type: String },
+  createdAt: { type: Date, default: Date.now },
 });
+
 const userSchema = new mongoose.Schema({
-  username: {
-    type: String,
-    required: true, // Ensure that this is marked as required
-  },
-  password: {
-    type: String,
-    required: true,
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true, // Ensure email is unique
-  },
-  role: {
-    type: String,
-    default: 'user', // or 'admin'
-  },
-  mobno: {
-    type: String,
-    required: true,
-  },
-  resetOTP: {
-    type: String, // OTP for password reset
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-  address: {
-    type: String,
-    required: false,
-  },
+  username: { type: String, required: true },
+  password: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  role: { type: String, default: 'user' },
+  mobno: { type: String, required: true },
+  resetOTP: { type: String },
+  resetOTPExpires: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+  address: { type: String },
   sessionId: { type: String, default: null },
   cartItems: [cartItemSchema],
-
-
 });
 
-// Ensure to use the model only if it hasn't been defined yet
-const User = mongoose.models.User || mongoose.model("User", userSchema)
+userSchema.index({ email: 1 });
+userSchema.index({ mobno: 1 });
+userSchema.index({ username: 1 });
 
-export default User
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+export default User;

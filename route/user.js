@@ -1,182 +1,159 @@
-import express from "express";
-import User from "../models/User.js"; // Adjust the import path if necessary
-import mongoose from "mongoose"; // Import mongoose for ID validation
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import express from 'express';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
+import User from '../models/User.js';
+import { authenticate } from '../middleware/auth.js';
+import asyncHandler from '../middleware/asyncHandler.js';
+
 const router = express.Router();
 
-// GET route to fetch user by ID
-router.get("/users/:userId", async (req, res) => {
-    const userId = req.params.userId; // Get the userId from the request parameters
+const validObjectId = (res, id) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    res.status(400).json({ success: false, msg: 'Invalid user ID format' });
+    return false;
+  }
+  return true;
+};
 
-    // Validate userId format
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ success: false, message: "Invalid user ID format" });
-    }
+const ownerOnly = (req, res, paramId) => {
+  if (req.user.userId.toString() !== paramId.toString()) {
+    res.status(403).json({ success: false, msg: 'Forbidden: cannot access another user\'s data' });
+    return false;
+  }
+  return true;
+};
 
-    try {
-        const user = await User.findById(userId); // Find the user in the database
+// GET /api/users/:userId
+router.get('/users/:userId', authenticate, asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (!validObjectId(res, userId)) return;
+  if (!ownerOnly(req, res, userId)) return;
 
-        if (!user) {
-            return res.status(404).json({ success: false, message: "User not found" }); // Handle user not found
-        }
+  const user = await User.findById(userId).select('-password');
+  if (!user) return res.status(404).json({ success: false, msg: 'User not found' });
 
-        res.json({ success: true, user }); // Return user details
-    } catch (err) {
-        console.error("Error fetching user:", err.message);
-        res.status(500).json({ success: false, message: "Server error", details: err.message }); // Handle server errors
-    }
-});
-// GET route to fetch user's cart
-router.get("/users/:userId/cart", async (req, res) => {
-    const userId = req.params.userId; // Get the userId from the request parameters
+  res.json({ success: true, user });
+}));
 
-    // Validate userId format
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ success: false, message: "Invalid user ID format" });
-    }
+// GET /api/users/:userId/cart
+router.get('/users/:userId/cart', authenticate, asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (!validObjectId(res, userId)) return;
+  if (!ownerOnly(req, res, userId)) return;
 
-    try {
-        const user = await User.findById(userId).populate("cart.itemId", "name price"); // Populate cart with item details (optional)
+  const user = await User.findById(userId).select('cart');
+  if (!user) return res.status(404).json({ success: false, msg: 'User not found' });
 
-        if (!user) {
-            return res.status(404).json({ success: false, message: "User not found" });
-        }
+  res.json({ success: true, cart: user.cart });
+}));
 
-        res.json({ success: true, cart: user.cart });
-    } catch (err) {
-        console.error("Error fetching cart:", err.message);
-        res.status(500).json({ success: false, message: "Server error", details: err.message });
-    }
-});
+// POST /api/users/:userId/cart
+router.post('/users/:userId/cart', authenticate, asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (!validObjectId(res, userId)) return;
+  if (!ownerOnly(req, res, userId)) return;
 
-// POST route to add item to user's cart
-router.post("/users/:userId/cart", async (req, res) => {
-    const userId = req.params.userId; // Get the userId from the request parameters
-    const { itemId, size, quantity = 1 } = req.body; // Destructure itemId, size, and quantity from the request body
+  const { itemId, size, quantity = 1 } = req.body;
+  if (!itemId || !size) {
+    return res.status(400).json({ success: false, msg: 'itemId and size are required' });
+  }
 
-    // Validate userId format
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ success: false, message: "Invalid user ID format" });
-    }
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ success: false, msg: 'User not found' });
 
-    // Validate itemId and size
-    if (!itemId || !size) {
-        return res.status(400).json({ success: false, message: "Item ID and size are required" });
-    }
+  const existingIdx = user.cart.findIndex(
+    (item) => item.itemId.toString() === itemId && item.size === size
+  );
+  if (existingIdx > -1) {
+    user.cart[existingIdx].quantity += quantity;
+  } else {
+    user.cart.push({ itemId, size, quantity });
+  }
 
-    try {
-        const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ success: false, message: "User not found" });
-        }
+  await user.save();
+  res.json({ success: true, msg: 'Item added to cart', cart: user.cart });
+}));
 
-        // Check if the item already exists in the cart
-        const existingItemIndex = user.cart.findIndex(item => item.itemId.toString() === itemId && item.size === size);
+// PUT /api/users/:userId/address
+router.put('/users/:userId/address', authenticate, asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (!validObjectId(res, userId)) return;
+  if (!ownerOnly(req, res, userId)) return;
 
-        if (existingItemIndex > -1) {
-            // Item already exists, update quantity
-            user.cart[existingItemIndex].quantity += quantity;
-        } else {
-            // Add new item to the cart
-            user.cart.push({ itemId, size, quantity });
-        }
+  const { address } = req.body;
+  if (!address || typeof address !== 'string') {
+    return res.status(400).json({ success: false, msg: 'Valid address is required' });
+  }
 
-        // Save the updated user
-        await user.save();
+  const updatedUser = await User.findByIdAndUpdate(userId, { address }, { new: true }).select('-password');
+  if (!updatedUser) return res.status(404).json({ success: false, msg: 'User not found' });
 
-        res.json({ success: true, message: "Item added to cart successfully!", cart: user.cart });
-    } catch (err) {
-        console.error("Error adding item to cart:", err.message);
-        res.status(500).json({ success: false, message: "Server error", details: err.message });
-    }
-});
+  res.json({ success: true, user: updatedUser });
+}));
 
-// PUT route to update user address
-router.put("/users/:userId/address", async (req, res) => {
-    const userId = req.params.userId; // Get the userId from the request parameters
-    const { address } = req.body; // Destructure the address from the request body
+// PUT /api/users/:userId — update profile (mobno, address)
+router.put('/users/:userId', authenticate, asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  if (!validObjectId(res, userId)) return;
+  if (!ownerOnly(req, res, userId)) return;
 
-    // Validate userId format
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ success: false, message: "Invalid user ID format" });
-    }
+  const { mobno, address } = req.body;
 
-    // Validate address (modify validation as per your requirements)
-    if (!address || typeof address !== "string") {
-        return res.status(400).json({ success: false, message: "Valid address is required" });
-    }
+  const user = await User.findById(userId);
+  if (!user) return res.status(404).json({ success: false, msg: 'User not found' });
 
-    try {
-        const updatedUser = await User.findByIdAndUpdate(
-            userId,
-            { address }, // Update the address
-            { new: true } // Return the updated user
-        );
+  if (mobno) user.mobno = mobno;
+  if (address) user.address = address;
 
-        if (!updatedUser) {
-            return res.status(404).json({ success: false, message: "User not found" }); // Handle user not found
-        }
+  await user.save();
 
-        res.json({ success: true, user: updatedUser }); // Return updated user details
-    } catch (err) {
-        console.error("Error updating user address:", err.message);
-        res.status(500).json({ success: false, message: "Server error", details: err.message }); // Handle server errors
-    }
-});
+  const newToken = jwt.sign(
+    { userId: user._id, username: user.username, email: user.email, mobno: user.mobno, address: user.address },
+    process.env.JWT_SECRET,
+    { expiresIn: '1h' }
+  );
 
-router.put('/users/:userId', async (req, res) => {
-    const { userId } = req.params;
-    const { mobno, address } = req.body;
+  res.json({
+    success: true,
+    msg: 'Profile updated successfully',
+    user: {
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      mobno: user.mobno,
+      address: user.address,
+    },
+    token: newToken,
+  });
+}));
 
-    try {
-        const user = await User.findById(userId);
-        if (!user) return res.status(404).json({ message: "User not found" });
+// PUT /api/users/:id/password
+router.put('/users/:id/password', authenticate, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!validObjectId(res, id)) return;
+  if (!ownerOnly(req, res, id)) return;
 
-        if (mobno) user.mobno = mobno;
-        if (address) user.address = address;
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, msg: 'currentPassword and newPassword are required' });
+  }
+  if (newPassword.length < 10) {
+    return res.status(400).json({ success: false, msg: 'New password must be at least 10 characters' });
+  }
 
-        // Save the updated user
-        await user.save();
+  const user = await User.findById(id);
+  if (!user) return res.status(404).json({ success: false, msg: 'User not found' });
 
-        // Optionally, you can re-issue a new JWT token here with the updated user data
-        const newToken = jwt.sign({ userId: user._id,
-                username: user.username,
-                email: user.email,
-                mobno: user.mobno,
-                address: user.address }, 'yourSecretKey', { expiresIn: '1h' });
+  const isMatch = await bcrypt.compare(currentPassword, user.password);
+  if (!isMatch) return res.status(400).json({ success: false, msg: 'Current password is incorrect' });
 
-        res.json({
-            message: "Profile updated successfully",
-            user,
-            token: newToken,  // Send the new token
-        });
-    } catch (error) {
-        res.status(500).json({ message: "Failed to update profile", error });
-    }
-});
+  user.password = await bcrypt.hash(newPassword, 10);
+  // Invalidate all sessions after password change
+  user.sessionId = null;
+  await user.save();
 
+  res.json({ success: true, msg: 'Password updated successfully. Please log in again.' });
+}));
 
-router.put("/users/:id/password", async (req, res) => {
-    const { id } = req.params;
-    const { currentPassword, newPassword } = req.body;
-
-    try {
-        const user = await User.findById(id);
-        if (!user) return res.status(404).json({ message: "User not found" });
-
-        // Verify current password
-        const isMatch = await bcrypt.compare(currentPassword, user.password);
-        if (!isMatch) return res.status(400).json({ message: "Current password is incorrect" });
-
-        // Hash and set new password
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(newPassword, salt);
-
-        await user.save();
-        res.json({ message: "Password updated successfully" });
-    } catch (error) {
-        res.status(500).json({ message: "Failed to update password", error });
-    }
-});
 export default router;

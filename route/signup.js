@@ -1,61 +1,54 @@
-import express from "express";
-import bcrypt from "bcrypt";
-import User from "../models/User.js"; // Assuming User model is defined in this path
-import Joi from "joi";
+import express from 'express';
+import bcrypt from 'bcrypt';
+import rateLimit from 'express-rate-limit';
+import Joi from 'joi';
+import User from '../models/User.js';
+import asyncHandler from '../middleware/asyncHandler.js';
 
 const router = express.Router();
 
-// Validation schema for registration input
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({ success: false, msg: 'Too many signup attempts. Please try again later.' });
+  },
+});
+
 const userSchema = Joi.object({
-  username: Joi.string().min(3).max(30).required().alphanum(),
+  username: Joi.string().alphanum().min(3).max(30).required(),
   mobno: Joi.string()
-    .pattern(/^\+\d{1,3}-\d{10}$/) // Adjusted to match the country code and 10-digit format correctly
+    .pattern(/^\+\d{1,3}-\d{10}$/)
     .required()
     .messages({
-      'string.pattern.base': 'Mobile number must start with a country code (e.g., +1) followed by 10 digits, formatted as xxxxx-xxxxx.',
-      'string.empty': 'Mobile number is required.',
+      'string.pattern.base': 'Mobile number must be formatted as +<country_code>-<10 digits>.',
     }),
   email: Joi.string().email().required(),
-  password: Joi.string().min(6).required(),
+  password: Joi.string().min(10).required().messages({
+    'string.min': 'Password must be at least 10 characters long.',
+  }),
 });
 
-
-// Register a new user
-router.post("/signup", async (req, res) => {
+router.post('/signup', signupLimiter, asyncHandler(async (req, res) => {
   const { username, mobno, email, password } = req.body;
 
-  // Validate input data
   const { error } = userSchema.validate({ username, mobno, email, password });
   if (error) {
-    return res.status(400).json({ success: false, message: error.details[0].message });
+    return res.status(400).json({ success: false, msg: error.details[0].message });
   }
 
-  try {
-    // Check if the user already exists
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(409).json({ success: false, message: "User already exists" });
-    }
-
-    // Hash the password before saving
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create a new user
-    user = new User({
-      username, // Include username here
-      mobno,
-      email,
-      password: hashedPassword, // Save the hashed password
-    });
-
-    // Save the new user to the database
-    await user.save();
-
-    res.status(201).json({ success: true, message: "User registered successfully" });
-  } catch (err) {
-    console.error("Error during user registration:", err.message);
-    res.status(500).json({ success: false, message: "Server error", details: err.message });
+  const existing = await User.findOne({ email });
+  if (existing) {
+    return res.status(409).json({ success: false, msg: 'User already exists' });
   }
-});
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const user = new User({ username, mobno, email, password: hashedPassword });
+  await user.save();
+
+  res.status(201).json({ success: true, msg: 'User registered successfully' });
+}));
 
 export default router;
